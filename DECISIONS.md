@@ -78,3 +78,16 @@ viac pokusov a nákupy v obchode. Generované levely 11+ sú pre priemerného hr
 - **Bandity** prichádzajú vo vlnách zo severu, vyberajú si kryty, ktoré ich chránia pred najbližším z nás, približne 11 m od nás, a pravidelne sa presúvajú. Pred výstrelom bliká „!“.
 - **Padnutý člen**: 60 % zranený (pôjde k doktorovi), 40 % padol natrvalo. Šerif padne = prehra.
 - Čísla: `src/tactics/tbalance.ts`. Vyváženie je zatiaľ len odhad, výsledok sa líši hru od hry (testovacie behy: raz výhra, raz prehra).
+
+## Krok 3 – mestečko a obchody
+- **Kampaň** (`src/tactics/campaign.ts`, vlastný záznam v localStorage): peniaze, zoznam mužov s menami (zbraň, počet misií, zásahy, zranenie, skupina A/B/doma), padlí, sklad munície podľa druhu, vylepšenia šerifa a doktora, kandidáti v saloone.
+- **Štart**: 120 $, 4 zástupcovia s revolvermi (výbava šerifovej kancelárie), 180 nábojov .45.
+- **Mesto**: ulica s piatimi obchodmi – ťuk na budovu alebo tlačidlo dole otvorí interiér: predavač za pultom, tovar na policiach/stenách, cenovky; nakupuje sa cez tabuľku vpravo.
+  - **ZBROJNICA**: puška 90 $, brokovnica 75 $ – vyberieš, ktorý muž ju dostane.
+  - **OBCHOD**: munícia po balíkoch (.45 ×12 = 8 $, puškové ×10 = 12 $, broky ×8 = 10 $).
+  - **SALOON**: 3 kandidáti (meno, zbraň, cena 30–80 $), max. 8 mužov. Po každej misii noví.
+  - **DOKTOR**: zranený vynechá 1 misiu, alebo ho okamžite vylieči za 25 $. Vylepšenie „Lepšie ošetrenie“ +10 % šanca, že padnutý muž prežije.
+  - **ŠERIF**: Výdrž (+1 zásah), Pevná ruka (presnosť), Rýchle prebíjanie + rozdelenie mužov do skupín (max. 3 na skupinu).
+- **Munícia na misiu**: každý si zo skladu vezme až 24 nábojov (puška 20, broky 12), šerif 36. Čo neminú, vrátia do skladu. Bez munície muž nestrieľa.
+- **Odmena**: výhra 50 $ + 5 $ za banditu + 10 $ × číslo misie, ústup 3 $ za banditu. Šerif po prehre neumiera natrvalo (muži ho odnesú), misia sa opakuje.
+- **„Dead Eye“ v pôvodnej hre premenované na „Sústredenie“** (právne riziko názvu z inej hry).

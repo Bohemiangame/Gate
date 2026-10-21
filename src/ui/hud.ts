@@ -65,7 +65,7 @@ export class Hud {
     this.ammo = $(`<div class="ammo hidden"></div>`);
     this.reloadTxt = $(`<div class="reloadtxt hidden">NABÍJAM…</div>`);
     this.weaponEl = $(`<div class="weapon hidden"></div>`);
-    this.deadEyeBtn = $<HTMLButtonElement>(`<button class="deadeye hidden"><div class="defill"></div><span>DEAD<br>EYE</span></button>`);
+    this.deadEyeBtn = $<HTMLButtonElement>(`<button class="deadeye hidden"><div class="defill"></div><span>SÚSTRE-<br>DENIE</span></button>`);
     this.deadEyeFill = this.deadEyeBtn.querySelector('.defill')!;
     this.deadEyeBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation();

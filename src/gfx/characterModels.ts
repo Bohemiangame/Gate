@@ -7,7 +7,7 @@ export const VS = 0.06;
 /** Guns use finer voxels so barrels/cylinders stay readable. */
 export const GVS = 0.04;
 
-export type Faction = 'posse' | 'posseB' | 'sheriff' | 'bandit' | 'boss';
+export type Faction = 'posse' | 'posseB' | 'sheriff' | 'bandit' | 'boss' | 'town';
 export type WeaponKind = 'revolver' | 'rifle' | 'shotgun' | 'dynamite' | 'gatling';
 export const WEAPONS: WeaponKind[] = ['revolver', 'rifle', 'shotgun', 'dynamite', 'gatling'];
 
@@ -69,6 +69,32 @@ function lookFor(faction: Faction, seed: number): Look {
       bandolier: false,
       eyepatch: false,
       hatTall: r() < 0.3,
+    };
+  }
+  if (faction === 'town') {
+    // shopkeepers: 0 gunsmith, 1 storekeeper, 2 barman, 3 doctor, 4 clerk
+    const looks = [
+      { shirt: 0xb8a890, vest: 0x5a3a20, hat: 0x6a4a2a, pants: 0x4a3a2a, coat: null, mustache: true },
+      { shirt: 0xe8e0d0, vest: 0x3a6a4a, hat: 0x3a3a3a, pants: 0x3a3a48, coat: null, mustache: false },
+      { shirt: 0xf0ece0, vest: 0x1a1a1a, hat: 0x2a1a12, pants: 0x2a2a2a, coat: null, mustache: true },
+      { shirt: 0xe8e8e8, vest: null, hat: 0x5a5a5a, pants: 0x2a2a2e, coat: 0x2a2a30, mustache: false },
+      { shirt: 0xd8d0b8, vest: 0x6a4a6a, hat: 0x8a6a40, pants: 0x4a4038, coat: null, mustache: true },
+    ];
+    const l = looks[seed % looks.length];
+    return {
+      skin: PAL.skin[seed % PAL.skin.length],
+      hair: pick([0x8a8a8a, 0x4a2e1a, 0x2a1a10], r),
+      shirt: l.shirt,
+      pants: l.pants,
+      hat: l.hat,
+      vest: l.vest,
+      coat: l.coat,
+      bandana: false,
+      mustache: l.mustache,
+      star: false,
+      bandolier: false,
+      eyepatch: false,
+      hatTall: false,
     };
   }
   if (faction === 'sheriff') {

@@ -5,6 +5,22 @@ import { makeCharacter } from '../gfx/models';
 import { buildBackdrop } from '../gfx/town';
 import { generatePlaza } from './map';
 import { DEFAULT_MISSION, Mission } from './mission';
+import { TacticsApp } from './app';
+
+function startApp(view: View, ui: HTMLElement): void {
+  const app = new TacticsApp(view, ui);
+  (window as unknown as { app: TacticsApp }).app = app;
+  let last = performance.now();
+  const frame = () => {
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    app.update(dt);
+    view.render();
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
 
 function startMission(view: View, ui: HTMLElement, params: URLSearchParams): void {
   const def = { ...DEFAULT_MISSION, seed: parseInt(params.get('seed') ?? String(DEFAULT_MISSION.seed), 10) };
@@ -24,7 +40,8 @@ function startMission(view: View, ui: HTMLElement, params: URLSearchParams): voi
 
 /** Tactics prototype entry (?tactics). Step 1: visual test only. */
 export function startTactics(view: View, ui: HTMLElement, params: URLSearchParams): void {
-  if (!params.has('test')) return startMission(view, ui, params);
+  if (params.has('quick')) return startMission(view, ui, params);
+  if (!params.has('test')) return startApp(view, ui);
   const scene = view.scene;
   view.vfov = parseFloat(params.get('fov') ?? '40');
   view.setPixelSize(parseFloat(params.get('pix') ?? '3'));

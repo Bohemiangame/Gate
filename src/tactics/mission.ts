@@ -11,25 +11,62 @@ import { TB } from './tbalance';
 import { GroupId, Unit } from './units';
 import { TacticsHud, CardInfo } from './thud';
 
+export interface SquadMember {
+  memberId: number;
+  group: 'A' | 'B';
+  name: string;
+  weapon: WeaponKind;
+  variant: number;
+  reserve: number;
+}
+
+export interface MissionResult {
+  won: boolean;
+  kills: number;
+  time: number;
+  fallen: number[];
+  wounded: number[];
+  /** Rounds left (magazine + reserve) per member id; -1 = sheriff. */
+  ammoLeft: Map<number, number>;
+  killsBy: Map<number, number>;
+}
+
 export interface MissionDef {
   name: string;
   seed: number;
-  squadA: WeaponKind[];
-  squadB: WeaponKind[];
+  squads: SquadMember[];
+  sheriff: { weapon: WeaponKind; hp: number; reserve: number; acc: number; reload: number };
   waves: { at: number; n: number; weapons?: WeaponKind[] }[];
+  enemyHp: number;
+  onEnd?: (r: MissionResult) => void;
+}
+
+/** Mission N of the campaign (difficulty grows with N). */
+export function missionWaves(n: number): { waves: MissionDef['waves']; enemyHp: number } {
+  const waves: MissionDef['waves'] = [];
+  const count = 3 + Math.floor(n / 2);
+  for (let i = 0; i < count; i++) {
+    const size = 3 + Math.floor((n + i) / 3);
+    const weapons: WeaponKind[] = [];
+    for (let k = 0; k < size; k++) weapons.push(Math.random() < 0.15 + n * 0.06 ? 'rifle' : Math.random() < n * 0.04 ? 'shotgun' : 'revolver');
+    waves.push({ at: i * 22, n: size, weapons });
+  }
+  return { waves, enemyHp: 3 + Math.floor(n / 3) };
 }
 
 export const DEFAULT_MISSION: MissionDef = {
   name: 'Námestie',
   seed: 7,
-  squadA: ['rifle', 'revolver', 'revolver'],
-  squadB: ['shotgun', 'revolver', 'revolver'],
-  waves: [
-    { at: 0, n: 4 },
-    { at: 22, n: 3, weapons: ['rifle', 'revolver', 'revolver'] },
-    { at: 44, n: 4 },
-    { at: 66, n: 4, weapons: ['rifle', 'revolver', 'rifle', 'revolver'] },
+  squads: [
+    { memberId: 1, group: 'A', name: 'Jake', weapon: 'rifle', variant: 0, reserve: 20 },
+    { memberId: 2, group: 'A', name: 'Billy', weapon: 'revolver', variant: 1, reserve: 24 },
+    { memberId: 3, group: 'A', name: 'Hank', weapon: 'revolver', variant: 2, reserve: 24 },
+    { memberId: 4, group: 'B', name: 'Wyatt', weapon: 'shotgun', variant: 0, reserve: 12 },
+    { memberId: 5, group: 'B', name: 'Cole', weapon: 'revolver', variant: 1, reserve: 24 },
+    { memberId: 6, group: 'B', name: 'Eli', weapon: 'revolver', variant: 2, reserve: 24 },
   ],
+  sheriff: { weapon: 'revolver', hp: 5, reserve: 36, acc: 0, reload: 0 },
+  ...missionWaves(1),
 };
 
 const NAMES = ['Jake', 'Billy', 'Hank', 'Wyatt', 'Cole', 'Eli', 'Jesse', 'Luke', 'Sam', 'Tom', 'Walt', 'Ned', 'Abe', 'Gus', 'Roy', 'Clay'];
@@ -55,6 +92,10 @@ export class Mission {
   units: Unit[] = [];
   sheriff: Unit;
   names = new Map<Unit, string>();
+  private memberOf = new Map<Unit, number>();
+  private killsBy = new Map<number, number>();
+  private backdrop: THREE.Group;
+  private disposed = false;
 
   phase: 'play' | 'won' | 'lost' = 'play';
   time = 0;
@@ -62,6 +103,10 @@ export class Mission {
   kills = 0;
   fallen: string[] = [];
   wounded: string[] = [];
+  fallenIds: number[] = [];
+  woundedIds: number[] = [];
+  /** Doctor upgrades raise the chance that a fallen man is only wounded. */
+  woundedBonus = 0;
 
   // selection / commands
   selected: GroupId | null = null;
@@ -106,6 +151,7 @@ export class Mission {
     const backdrop = buildBackdrop();
     backdrop.scale.setScalar(0.9);
     backdrop.position.set(0, 0, 10);
+    this.backdrop = backdrop;
     this.scene.add(backdrop, this.root, this.particles.mesh, this.tracers.group, this.flashes.group);
     this.map = generatePlaza(def.seed, this.root);
     this.hud = new TacticsHud(ui);
@@ -123,12 +169,18 @@ export class Mission {
 
     // our side
     const sp = this.map.playerSpawns;
-    this.sheriff = this.addUnit('player', 'S', 'revolver', 0, sp[0], TB.sheriffHp, TB.sheriffReserve);
+    this.sheriff = this.addUnit('player', 'S', def.sheriff.weapon, 0, sp[0], def.sheriff.hp, def.sheriff.reserve);
     this.names.set(this.sheriff, 'Šerif');
-    def.squadA.forEach((w, i) => this.addUnit('player', 'A', w, i, sp[1].clone().add(new THREE.Vector3(-i * 0.8, 0, i * 0.5)), TB.posseHp, TB.posseReserve));
-    def.squadB.forEach((w, i) => this.addUnit('player', 'B', w, i, sp[2].clone().add(new THREE.Vector3(i * 0.8, 0, i * 0.5)), TB.posseHp, TB.posseReserve));
-    let ni = Math.floor(Math.random() * NAMES.length);
-    for (const u of this.units) if (!this.names.has(u)) this.names.set(u, NAMES[ni++ % NAMES.length]);
+    this.memberOf.set(this.sheriff, -1);
+    let ia = 0, ib = 0;
+    for (const m of def.squads) {
+      const i = m.group === 'A' ? ia++ : ib++;
+      const base = m.group === 'A' ? sp[1] : sp[2];
+      const u = this.addUnit('player', m.group, m.weapon, m.variant, base.clone().add(new THREE.Vector3((m.group === 'A' ? -1 : 1) * i * 0.8, 0, i * 0.5)), TB.posseHp, m.reserve);
+      this.names.set(u, m.name);
+      this.memberOf.set(u, m.memberId);
+    }
+    void NAMES;
     const Z = this.map.bounds.maxZ;
     this.orderMove('S', new THREE.Vector3(0, 0, Z - 5));
     this.orderMove('A', new THREE.Vector3(-6, 0, Z - 5));
@@ -219,6 +271,7 @@ export class Mission {
   private bindInput(canvas: HTMLElement): void {
     const pad = this.hud.aimPad;
     pad.addEventListener('pointerdown', (e) => {
+      if (this.disposed) return;
       e.stopPropagation();
       e.preventDefault();
       audio.unlock();
@@ -239,7 +292,7 @@ export class Mission {
       }
     });
     pad.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== this.aimId) return;
+      if (this.disposed || e.pointerId !== this.aimId) return;
       const dx = e.clientX - this.aimLast.x;
       const dy = e.clientY - this.aimLast.y;
       this.aimLast.set(e.clientX, e.clientY);
@@ -261,6 +314,7 @@ export class Mission {
     pad.addEventListener('pointercancel', padUp);
 
     canvas.addEventListener('pointerdown', (e) => {
+      if (this.disposed) return;
       audio.unlock();
       if (this.mapId !== null) return;
       this.mapId = e.pointerId;
@@ -269,7 +323,7 @@ export class Mission {
       this.mapMoved = false;
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (e.pointerId !== this.mapId) return;
+      if (this.disposed || e.pointerId !== this.mapId) return;
       if (Math.hypot(e.clientX - this.mapStart.x, e.clientY - this.mapStart.y) > 12) this.mapMoved = true;
       if (this.mapMoved) {
         const k = this.view.camera.position.distanceTo(this.camTarget) / window.innerHeight;
@@ -281,13 +335,14 @@ export class Mission {
       this.mapLast.set(e.clientX, e.clientY);
     });
     const mapUp = (e: PointerEvent) => {
-      if (e.pointerId !== this.mapId) return;
+      if (this.disposed || e.pointerId !== this.mapId) return;
       this.mapId = null;
       if (!this.mapMoved && this.phase === 'play') this.tap(e.clientX, e.clientY);
     };
     canvas.addEventListener('pointerup', mapUp);
     canvas.addEventListener('pointercancel', () => (this.mapId = null));
     window.addEventListener('keydown', (e) => {
+      if (this.disposed) return;
       if (e.key === '1') this.select('S');
       if (e.key === '2') this.select('A');
       if (e.key === '3') this.select('B');
@@ -420,8 +475,11 @@ export class Mission {
       vibrate(t.group === 'S' ? 80 : 30);
       if (t.group === 'S') audio.play('hurt');
     } else audio.play(head ? 'headshot' : 'hit', 0.05);
-    if (t.hp <= 0) this.kill(t);
-    void by;
+    if (t.hp <= 0) {
+      this.kill(t);
+      const id = by ? this.memberOf.get(by) : undefined;
+      if (id !== undefined && t.side === 'enemy') this.killsBy.set(id, (this.killsBy.get(id) ?? 0) + 1);
+    }
   }
 
   private kill(t: Unit): void {
@@ -445,11 +503,14 @@ export class Mission {
       this.lose();
       return;
     }
-    if (Math.random() < TB.woundedChance) {
+    const mid = this.memberOf.get(t) ?? 0;
+    if (Math.random() < TB.woundedChance + this.woundedBonus) {
       this.wounded.push(name);
+      this.woundedIds.push(mid);
       this.floatAt(t.pos.clone().setY(2.2), `${name}: ZRANENÝ`, 'bad');
     } else {
       this.fallen.push(name);
+      this.fallenIds.push(mid);
       this.floatAt(t.pos.clone().setY(2.2), `${name} PADOL`, 'bad');
     }
   }
@@ -689,7 +750,7 @@ export class Mission {
       if (s.mag < s.w.mag && s.reserve > 0) {
         s.c.pose = 'reload';
         this.sheriffReloadT += dt;
-        if (this.sheriffReloadT > s.w.reload / s.w.mag) {
+        if (this.sheriffReloadT > (s.w.reload / s.w.mag) * (1 - 0.15 * this.def.sheriff.reload)) {
           this.sheriffReloadT = 0;
           s.mag++;
           s.reserve--;
@@ -705,8 +766,9 @@ export class Mission {
     this.flashes.spawn(m, 0.45, 0.05);
     audio.play('revolver', 0.04);
     const dir = aimPoint.clone().sub(m).normalize();
-    dir.x += (Math.random() - 0.5) * TB.sheriffAccSpread;
-    dir.y += (Math.random() - 0.5) * TB.sheriffAccSpread;
+    const spread = TB.sheriffAccSpread * (1 - 0.2 * this.def.sheriff.acc);
+    dir.x += (Math.random() - 0.5) * spread;
+    dir.y += (Math.random() - 0.5) * spread;
     dir.normalize();
     const targets: Hittable[] = [];
     for (const u of this.units) {
@@ -750,7 +812,7 @@ export class Mission {
         const sp = this.map.enemySpawns[i % this.map.enemySpawns.length].clone();
         sp.z -= 1.5 + Math.floor(i / 3) * 1.2;
         const weapon = w.weapons?.[i] ?? 'revolver';
-        const u = this.addUnit('enemy', 'E', weapon, i + this.waveIdx * 3, sp, TB.enemyHp, 18);
+        const u = this.addUnit('enemy', 'E', weapon, i + this.waveIdx * 3, sp, this.def.enemyHp, 18);
         u.repoT = 0;
         u.timer = 1 + Math.random();
       }
@@ -851,6 +913,16 @@ export class Mission {
     this.hud.setTop(`${this.def.name} · vlna ${Math.max(1, this.waveIdx)}/${this.def.waves.length} · bandity: ${enemies}${this.selected ? ' · <span style="color:#ffd060">ťukni, kam ísť</span>' : ''}`);
   }
 
+  /** Remove everything this mission added to the scene and the UI. */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const u of this.units) u.c.dispose();
+    this.scene.remove(this.root, this.backdrop, this.particles.mesh, this.tracers.group, this.flashes.group);
+    this.batcher.dispose();
+    this.hud.root.remove();
+  }
+
   private floatAt(p: THREE.Vector3, text: string, cls = ''): void {
     tmp2.copy(p).project(this.view.camera);
     if (tmp2.z > 1) return;
@@ -861,7 +933,7 @@ export class Mission {
     this.phase = 'won';
     audio.play('win');
     this.hud.showBanner('NÁMESTIE JE NAŠE!', '', 2.5);
-    setTimeout(() => this.result(true), 2200);
+    setTimeout(() => !this.disposed && this.result(true), 2200);
   }
 
   private lose(): void {
@@ -869,10 +941,16 @@ export class Mission {
     this.phase = 'lost';
     audio.play('lose');
     this.hud.showBanner('ŠERIF PADOL', 'bad', 2.5);
-    setTimeout(() => this.result(false), 2200);
+    setTimeout(() => !this.disposed && this.result(false), 2200);
   }
 
   private result(won: boolean): void {
+    if (this.def.onEnd) {
+      const ammoLeft = new Map<number, number>();
+      for (const u of this.units) if (u.side === 'player' && u.alive) ammoLeft.set(this.memberOf.get(u) ?? 0, u.mag + u.reserve);
+      this.def.onEnd({ won, kills: this.kills, time: this.time, fallen: this.fallenIds, wounded: this.woundedIds, ammoLeft, killsBy: this.killsBy });
+      return;
+    }
     const list = (a: string[]) => (a.length ? a.join(', ') : '–');
     this.hud.openScreen(
       `<h1>${won ? 'VÝHRA!' : 'PREHRA'}</h1>
@@ -883,6 +961,10 @@ export class Mission {
       [{ label: 'HRAŤ ZNOVA', onClick: () => location.reload() }],
     );
   }
+}
+
+export function disposeMission(m: Mission): void {
+  m.dispose();
 }
 
 function unitBoxes(u: Unit, out: Box[]): void {

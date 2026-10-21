@@ -43,6 +43,14 @@ export class CharacterBatcher {
     return np;
   }
 
+  dispose(): void {
+    for (const p of this.pools.values()) {
+      this.scene.remove(p.mesh);
+      p.mesh.dispose();
+    }
+    this.pools.clear();
+  }
+
   sync(): void {
     for (const p of this.pools.values()) p.count = 0;
     for (const c of characters) {

@@ -977,7 +977,7 @@ export class Game {
     this.deadEyeT = BALANCE.deadEyeDuration;
     audio.play('deadeye');
     vibrate(40);
-    this.hud.showBanner('DEAD EYE', 'small', 1.0);
+    this.hud.showBanner('SÚSTREDENIE', 'small', 1.0);
   }
 
   // =====================================================================
