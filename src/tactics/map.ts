@@ -357,6 +357,9 @@ export function generatePlaza(seed: number, scene: THREE.Object3D, X = 12, Z = 1
 export const MAP_NAMES: Record<MapKind, string> = { plaza: 'Námestie', desert: 'Pustatina', rail: 'Železnica' };
 export const MAP_GOALS: Record<MapKind, string> = { plaza: 'Vyčisti námestie od bandy', desert: 'Prepadnutie v pustatine – ubráň sa', rail: 'Zachráň stanicu pred bandou' };
 
+/** When true, scenery is kept as separate named objects (for exporting the map to a 3D editor). */
+export const mapExport = { separate: false };
+
 export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, X = 12, Z = 14): MapData {
   const r = rng(seed);
   const group = new THREE.Group();
@@ -376,7 +379,15 @@ export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, 
   // ---- static scenery (merged) ----
   const statics: THREE.BufferGeometry[] = [];
   const tmp = new THREE.Object3D();
-  const addStatic = (geo: THREE.BufferGeometry, x: number, z: number, rotY: number) => {
+  const addStatic = (geo: THREE.BufferGeometry, x: number, z: number, rotY: number, name = 'decor') => {
+    if (mapExport.separate) {
+      const m = new THREE.Mesh(geo, voxelMaterial);
+      m.name = name;
+      m.position.set(x, 0, z);
+      m.rotation.y = rotY;
+      group.add(m);
+      return;
+    }
     tmp.position.set(x, 0, z);
     tmp.rotation.set(0, rotY, 0);
     tmp.updateMatrix();
@@ -397,7 +408,7 @@ export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, 
       if (gap && p < gap[0] && p + wM > gap[0]) {
         // doesn't fit before the gap: fence the rest
         const len = gap[0] - p;
-        if (len > 1) for (let q = p; q < gap[0] - 0.5; q += 4) addStatic(prop('fence').geo, axis === 'x' ? q + 2 : fixed, axis === 'x' ? fixed : q + 2, axis === 'x' ? 0 : Math.PI / 2);
+        if (len > 1) for (let q = p; q < gap[0] - 0.5; q += 4) addStatic(prop('fence').geo, axis === 'x' ? q + 2 : fixed, axis === 'x' ? fixed : q + 2, axis === 'x' ? 0 : Math.PI / 2, 'decor_fence');
         p = gap[0];
         continue;
       }
@@ -406,7 +417,7 @@ export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, 
         if (wM < 3) break;
       }
       const c = p + v.widthM / 2;
-      addStatic(v.geo, axis === 'x' ? c : fixed, axis === 'x' ? fixed : c, rot);
+      addStatic(v.geo, axis === 'x' ? c : fixed, axis === 'x' ? fixed : c, rot, `building_${(vi - 1) % vars.length}`);
       p += v.widthM + (r() < 0.3 ? 1 + r() * 1.5 : 0);
     }
   };
@@ -421,7 +432,7 @@ export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, 
       const sz = (r() - 0.5) * (Z * 1.6);
       addStatic(prop(r() < 0.5 ? 'lamp' : 'hitch').geo, sx, sz, Math.PI / 2);
     }
-    addStatic(prop('wanted').geo, -4.6, Z - 0.8, Math.PI);
+    addStatic(prop('wanted').geo, -4.6, Z - 0.8, Math.PI, 'decor_wanted');
     for (let k = 0; k < 6; k++) addStatic(prop('cactus', k + 1).geo, (r() - 0.5) * 8, -Z - 6 - r() * 10, r() * 6);
   } else if (kind === 'desert') {
     // open land: cacti, dead trees and rocks around (decor), a few inside (no cover)
@@ -440,7 +451,7 @@ export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, 
     for (let k = 0; k < 12; k++) addStatic(prop(r() < 0.5 ? 'cactus' : 'tree', 1 + (k % 5)).geo, (r() - 0.5) * 50, -Z - 3 - r() * 16, r() * 6);
   }
 
-  const merged = mergeGeometries(statics, false);
+  const merged = statics.length ? mergeGeometries(statics, false) : null;
   for (const s of statics) s.dispose();
   if (merged) group.add(new THREE.Mesh(merged, voxelMaterial));
 
@@ -450,6 +461,7 @@ export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, 
   const place = (kind: CoverKind, x: number, z: number, rotated: boolean, seedK = 1) => {
     const m = prop(kind, seedK);
     const mesh = new THREE.Mesh(m.geo, voxelMaterial);
+    mesh.name = `cover_${kind}`;
     mesh.position.set(x, 0, z);
     mesh.rotation.y = rotated ? Math.PI / 2 : 0;
     group.add(mesh);

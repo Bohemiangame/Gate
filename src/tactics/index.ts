@@ -6,6 +6,7 @@ import { buildBackdrop } from '../gfx/town';
 import { generatePlaza } from './map';
 import { DEFAULT_MISSION, Mission } from './mission';
 import { TacticsApp } from './app';
+import { startExport } from './exportmap';
 
 function startApp(view: View, ui: HTMLElement): void {
   const app = new TacticsApp(view, ui);
@@ -40,6 +41,7 @@ function startMission(view: View, ui: HTMLElement, params: URLSearchParams): voi
 
 /** Tactics prototype entry (?tactics). Step 1: visual test only. */
 export function startTactics(view: View, ui: HTMLElement, params: URLSearchParams): void {
+  if (params.has('export')) return startExport(view, params);
   if (params.has('quick')) return startMission(view, ui, params);
   if (!params.has('test')) return startApp(view, ui);
   const scene = view.scene;
