@@ -61,7 +61,7 @@ html, body {
 .reloadtxt { position: absolute; left: 0; right: 0; text-align: center; bottom: calc(env(safe-area-inset-bottom) + 50px); font-weight: 900; font-size: 15px; color: #fff3c8; text-shadow: 0 2px 0 #2a1408; }
 .reloadtxt.urgent { color: #ff7a5a; animation: blink 0.5s infinite; font-size: 18px; }
 @keyframes blink { 50% { opacity: 0.35; } }
-.weapon { position: absolute; left: 82px; bottom: calc(env(safe-area-inset-bottom) + 22px); font-weight: 900; font-size: 14px; color: #ffe8b0; background: rgba(40,20,8,0.6); padding: 4px 10px; border-radius: 8px; border: 2px solid #3a2010; }
+.weapon { position: absolute; left: 12px; bottom: calc(env(safe-area-inset-bottom) + 18px); font-weight: 900; font-size: 14px; color: #ffe8b0; background: rgba(40,20,8,0.6); padding: 4px 10px; border-radius: 8px; border: 2px solid #3a2010; }
 .deadeye {
   position: absolute; right: 14px; bottom: calc(env(safe-area-inset-bottom) + 14px);
   width: 66px; height: 66px; border-radius: 50%; border: 3px solid #3a2010; background: rgba(40,20,8,0.6);
@@ -126,3 +126,5 @@ html, body {
 .levelsel button { font-size: 13px; padding: 6px 8px; min-width: 40px; }
 .debug { position: absolute; left: 6px; top: calc(env(safe-area-inset-top) + 64px); font: 12px monospace; color: #0f0; background: rgba(0,0,0,0.6); padding: 4px 6px; border-radius: 4px; pointer-events: auto; max-width: 60%; }
 .debug button { font: 11px monospace; margin: 2px; padding: 2px 5px; }
+
+.weapon.infight { left: 82px; bottom: calc(env(safe-area-inset-bottom) + 22px); }

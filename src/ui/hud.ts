@@ -81,7 +81,10 @@ export class Hud {
   show(el: 'top' | 'posse' | 'ammo' | 'deadeye' | 'boss' | 'weapon', on: boolean): void {
     const map = { top: this.top, posse: this.posse, ammo: this.ammo, deadeye: this.deadEyeBtn, boss: this.bossBar, weapon: this.weaponEl };
     map[el].classList.toggle('hidden', !on);
-    if (el === 'ammo' && !on) this.reloadTxt.classList.add('hidden');
+    if (el === 'ammo') {
+      if (!on) this.reloadTxt.classList.add('hidden');
+      this.weaponEl.classList.toggle('infight', on);
+    }
   }
 
   setLevel(name: string): void {
