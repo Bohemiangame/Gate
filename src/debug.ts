@@ -30,7 +30,7 @@ export function installDebug(game: Game, root: HTMLElement): (dt: number) => voi
     for (let i = 0; i < 5; i++) game.addMember();
   });
   add('bot', () => {
-    game.autoplay = game.autoplay ? null : { duck: 0.85, aimError: 0.25, headBias: 0.4, greedy: 0.6 };
+    game.autoplay = game.autoplay ? null : { duck: 0.85, aimError: 0.25, headBias: 0.4, greedy: 0.6, react: 0.35 };
   });
   add('kill all', () => {
     if (game.fight) for (const e of game.fight.enemies) if (e.alive) e.kill();

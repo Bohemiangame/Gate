@@ -43,8 +43,8 @@ export const BALANCE = {
   aimOffsetPx: 56,
   coverHp: 30,
   /** Enemy shot timing. */
-  enemyHiddenMin: 1.2,
-  enemyHiddenMax: 2.8,
+  enemyHiddenMin: 1.0,
+  enemyHiddenMax: 2.4,
   enemyTelegraph: 0.75,
   enemyExposedAfterShot: 0.45,
   /** Chance an enemy shot kills a member when the posse is exposed. */
@@ -80,31 +80,36 @@ export const BALANCE = {
   // ---------- Global HP multipliers (applied on top of level data) ----------
   enemyHpMul: 6,
   riderHpMul: 4,
-  bossHpMul: 4,
+  bossHpMul: 3.2,
 
   // ---------- Difficulty scaling per level (index 0 = level 1) ----------
   /** Enemy HP multiplier: 1 + hpGrowth * level. */
-  hpGrowth: 0.1,
+  hpGrowth: 0.14,
+  /** Quadratic term so later levels keep up with upgrades. */
+  hpGrowth2: 0.006,
   /** Telegraph shrinks per level down to the minimum. */
-  telegraphShrink: 0.02,
-  telegraphMin: 0.45,
+  telegraphShrink: 0.015,
+  telegraphMin: 0.5,
   /** Gate values grow slower than enemy HP. */
   gateGrowth: 0.06,
 
   // ---------- Rewards ----------
-  coinsPerSurvivor: 6,
-  coinsPerStar: 12,
+  coinsPerSurvivor: 4,
+  coinsPerStar: 8,
   coinsPerLevel: 4,
+  /** Consolation after a loss: coins per % of the level done (×100) and per kill. */
+  loseCoinsProgress: 35,
+  loseCoinsPerKill: 2,
   /** 2nd star: survivors >= this share of the peak posse size. */
   starSurvivorShare: 0.6,
 
   // ---------- Shop upgrades: base cost, cost growth, max level ----------
   upgrades: {
-    start: { name: 'Väčšia skupina', desc: '+1 člen na štarte', base: 40, growth: 1.55, max: 6 },
-    damage: { name: 'Poškodenie', desc: '+15 % poškodenie', base: 35, growth: 1.5, max: 10 },
-    rate: { name: 'Rýchla ruka', desc: '+10 % rýchlosť streľby', base: 35, growth: 1.5, max: 8 },
-    reload: { name: 'Nabíjanie', desc: '+20 % rýchlosť nabíjania', base: 30, growth: 1.45, max: 6 },
-    cover: { name: 'Pevný kryt', desc: '+25 % odolnosť krytu', base: 30, growth: 1.45, max: 6 },
+    start: { name: 'Väčšia skupina', desc: '+1 člen na štarte', base: 45, growth: 1.7, max: 6 },
+    damage: { name: 'Poškodenie', desc: '+15 % poškodenie', base: 40, growth: 1.6, max: 10 },
+    rate: { name: 'Rýchla ruka', desc: '+10 % rýchlosť streľby', base: 40, growth: 1.6, max: 8 },
+    reload: { name: 'Nabíjanie', desc: '+20 % rýchlosť nabíjania', base: 30, growth: 1.55, max: 6 },
+    cover: { name: 'Pevný kryt', desc: '+25 % odolnosť krytu', base: 30, growth: 1.55, max: 6 },
     weapon: { name: 'Štartová zbraň', desc: 'Trvalo lepšia zbraň na štarte', base: 150, growth: 2.4, max: 2 },
   },
 };
@@ -117,7 +122,7 @@ export function upgradeCost(key: UpgradeKey, level: number): number {
 }
 
 export function hpScale(levelIndex: number): number {
-  return 1 + BALANCE.hpGrowth * levelIndex;
+  return 1 + BALANCE.hpGrowth * levelIndex + BALANCE.hpGrowth2 * levelIndex * levelIndex;
 }
 
 export function telegraphFor(levelIndex: number): number {

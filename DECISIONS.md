@@ -29,3 +29,24 @@ Sem zapisujem rozhodnutia, ktoré som urobil sám bez otázok. Najnovšie hore v
 - **Prehra** dáva malú útechu v minciach (podľa prejdenej časti a zabitých), aby sa dalo nakúpiť a skúsiť znova.
 - **Reklamy** sú len prázdne miesto (`src/ads.ts`, `available: false`) – tlačidlo „2× mince“ sa ukáže až po zapojení portálu.
 - **Autopilot (bot)** v kóde hry: používa ho simulácia (`?sim`) a tlačidlo `bot` v `?debug`. Simulácia beží na skutočnej hernej logike bez vykresľovania.
+
+## Fáza 6 – ladenie čísel (simulácia `?sim`)
+Simulácia hrá skutočnú hernú logiku botom s tromi profilmi hráča:
+**dobrý** (reakcia 0,3 s, presná muška), **priemerný** (0,45 s), **slabý** (0,65 s, často nestihne kryt).
+Bot medzi levelmi nakupuje v obchode najlacnejšie vylepšenie. Cieľ: prvé 3 levely ľahké pre všetkých, dobrý hráč končí s ~8–15 členmi, potom treba voliť rozumne.
+
+| Krok | Problém v simulácii | Zmena |
+|---|---|---|
+| 1 | Skupina vždy narástla na 20, level za 35 s, všetci 3★ | HP banditov ×3 (`enemyHpMul`), cena vylepšenia brány rastie |
+| 2 | Stále 20 – vylepšovanie kladných brán streľbou bolo príliš silné | Streľbou sa dá zdvihnúť len záporná/nulová brána, najviac na +1 (`gateShootCap`); ×2 odstránené z levelov 1–5 |
+| 3 | Bandity umierali počas „!“ skôr, než vystrelili | `enemyHpMul` 6, jazdci ×4, boss ×4 |
+| 4 | Boss v 8.–9. leveli mal ~1800 HP, prehry na 92 % | Boss HP v dátach 28→86 (namiesto 28→240), `hpGrowth` 0,16 → 0,1 |
+| 5 | Bot bez reakčného času – profily sa nelíšili | Bot má reakčný čas na „!“ aj na zmenu cieľa |
+| 6 | Od 6. levelu opäť 20 (veľa mincí, ×2 brány v strede levelu) | Menej mincí za preživších (6→4) a hviezdy (12→8), drahší obchod (rast 1,55–1,7), `hpGrowth` 0,14 + kvadratický člen, bandity sa vykláňajú častejšie, ×2 presunuté na prvú bránu levelu |
+| 7 | Neskoré levely 130–170 s, slabý hráč nemal z čoho nakúpiť | Boss ×3,2, kvadratický člen 0,006, útecha za prehru 35 × podiel + 2/zabitý |
+| 8 | Slabý hráč (0,65 s) nestihol nikdy kryt od 7. levelu | Varovanie sa skracuje pomalšie (0,015/level, min 0,5 s) |
+
+**Výsledok (priemer 2 behov):** levely 1–3 vyhrajú všetci na prvý pokus (8–11 preživších, ~55–65 s).
+Priemerný hráč: 4.–10. level vyhráva s 9–15 preživšími, 85–118 s. Slabý hráč: od 7.–12. levelu potrebuje
+viac pokusov a nákupy v obchode. Generované levely 11+ sú pre priemerného hráča zatiaľ skôr ľahšie.
+**Známe:** neskoré levely sú o niečo dlhšie (90–120 s) ako cieľ 60–90 s – skrátenie by išlo menším počtom banditov alebo kratšími úsekmi.

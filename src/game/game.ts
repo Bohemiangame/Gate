@@ -106,8 +106,10 @@ export class Game {
 
   god = false;
   /** Bot player used by tests and the balance simulation (?sim / debug). */
-  autoplay: null | { duck: number; aimError: number; headBias: number; greedy: number } = null;
+  autoplay: null | { duck: number; aimError: number; headBias: number; greedy: number; react: number } = null;
   private botT = 0;
+  private botTarget: unknown = null;
+  private botAcquire = 0;
   /** Called when a level ends (used by the simulation). */
   onResult: ((r: { won: boolean; level: number; survivors: number; peak: number; time: number; stars: number; coins: number; progress: number; lost: number }) => void) | null = null;
   private ctx: Ctx;
@@ -521,11 +523,17 @@ export class Game {
   private botFight(f: FightRT, dt: number): void {
     const bot = this.autoplay!;
     this.botT -= dt;
-    const danger = f.enemies.some((e) => e.alive && e.state === 'warn' && e.timer < 0.3 + (e.isBoss ? 0.1 : 0));
+    this.botAcquire -= dt;
+    // a "!" is noticed only after the reaction time has passed since it appeared
+    const danger = f.enemies.some((e) => {
+      if (!e.alive || e.state !== 'warn') return false;
+      const total = e.isBoss ? BALANCE.bossTelegraph : telegraphFor(this.levelIndex);
+      return total - e.timer > bot.react;
+    });
     const w = BALANCE.weapons[this.weapon];
     if (danger && Math.random() < bot.duck) {
       this.holding = false;
-      this.botT = 0.25;
+      this.botT = 0.3;
       return;
     }
     if (this.botT > 0) return;
@@ -534,22 +542,33 @@ export class Game {
       this.botT = 0.2;
       return;
     }
-    // target: exposed enemy (prefer TNT near enemies, boss last), else shoot cover of nearest
+    // target: TNT next to enemies, else an exposed enemy (boss last), else chew through the nearest cover
     const exposedE = f.enemies.filter((e) => e.alive && e.exposed);
     let aim: THREE.Vector3 | null = null;
+    let target: unknown = null;
     const tnt = f.covers.find((c) => c.alive && c.isTnt && f.enemies.some((e) => e.alive && e.c.root.position.distanceTo(c.pos) < BALANCE.tntRadius));
-    if (tnt) aim = tnt.pos.clone().setY(0.45);
-    else if (exposedE.length) {
-      const e = exposedE.sort((a, b) => (a.isBoss ? 1 : 0) - (b.isBoss ? 1 : 0))[0];
+    if (tnt) {
+      aim = tnt.pos.clone().setY(0.45);
+      target = tnt;
+    } else if (exposedE.length) {
+      const keep = exposedE.find((e) => e === this.botTarget);
+      const e = keep ?? exposedE.sort((a, b) => (a.isBoss ? 1 : 0) - (b.isBoss ? 1 : 0))[0];
+      target = e;
       aim = new THREE.Vector3();
       if (Math.random() < bot.headBias) e.c.headCenter(aim);
       else aim.copy(e.c.root.position).setY(e.c.root.position.y + 0.85 * e.c.root.scale.y);
     } else {
-      // nobody up: chew through the cover of the closest enemy
       const e = f.enemies.find((k) => k.alive);
-      if (e && e.cover && e.cover.alive) aim = e.cover.pos.clone().setY(e.cover.pos.y + 0.5);
+      if (e && e.cover && e.cover.alive) {
+        aim = e.cover.pos.clone().setY(e.cover.pos.y + 0.5);
+        target = e.cover;
+      }
     }
-    if (!aim) {
+    if (target !== this.botTarget) {
+      this.botTarget = target;
+      this.botAcquire = bot.react * 0.8;
+    }
+    if (!aim || this.botAcquire > 0) {
       this.holding = false;
       return;
     }
@@ -1010,7 +1029,7 @@ export class Game {
       const st = won ? this.stars() : 0;
       const coins = won
         ? this.members.length * BALANCE.coinsPerSurvivor + st * BALANCE.coinsPerStar + (this.levelIndex + 1) * BALANCE.coinsPerLevel
-        : Math.floor(this.progressFrac() * 20) + this.kills;
+        : Math.floor(this.progressFrac() * BALANCE.loseCoinsProgress) + this.kills * BALANCE.loseCoinsPerKill;
       this.onResult({ won, level: this.levelIndex, survivors: this.members.length, peak: this.peak, time: this.levelTime, stars: st, coins, progress: this.progressFrac(), lost: this.lost });
       return;
     }
@@ -1050,7 +1069,7 @@ export class Game {
       );
     } else {
       const progress = this.progressFrac();
-      const coins = Math.floor(progress * 20) + this.kills;
+      const coins = Math.floor(progress * BALANCE.loseCoinsProgress) + this.kills * BALANCE.loseCoinsPerKill;
       this.addCoins(coins);
       writeSave(this.save);
       this.hud.openScreen(

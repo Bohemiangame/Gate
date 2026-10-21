@@ -12,10 +12,10 @@ import { defaultSave } from './game/save';
 export async function runSim(view: View, ui: HTMLElement, params: URLSearchParams): Promise<void> {
   const levels = parseInt(params.get('levels') ?? '12', 10);
   const runs = parseInt(params.get('runs') ?? '3', 10);
-  const profiles: Record<string, { duck: number; aimError: number; headBias: number; greedy: number }> = {
-    good: { duck: 0.95, aimError: 0.12, headBias: 0.6, greedy: 0.8 },
-    average: { duck: 0.75, aimError: 0.3, headBias: 0.3, greedy: 0.5 },
-    bad: { duck: 0.45, aimError: 0.5, headBias: 0.1, greedy: 0.2 },
+  const profiles: Record<string, { duck: number; aimError: number; headBias: number; greedy: number; react: number }> = {
+    good: { duck: 0.95, aimError: 0.15, headBias: 0.5, greedy: 0.8, react: 0.3 },
+    average: { duck: 0.8, aimError: 0.3, headBias: 0.25, greedy: 0.5, react: 0.45 },
+    bad: { duck: 0.6, aimError: 0.5, headBias: 0.1, greedy: 0.2, react: 0.65 },
   };
   const which = (params.get('profile') ?? 'good,average,bad').split(',');
   const out: Record<string, unknown[]> = {};

@@ -100,9 +100,9 @@ export const LEVELS: LevelDef[] = [
     seed: 37,
     par: 80,
     segments: [
-      run(60, gates(12, '+2', '+1'), rider(28, -1, 3), crate(40, 1.6, 18, 'rifle'), gates(52, '-1', '+3')),
+      run(60, gates(12, '+2', '+1'), rider(28, -1, 3), crate(40, 1.6, 18, 'rifle'), gates(52, '-1', '+2')),
       fight([e('barrel', -2, 12, 3), e('wagon', 1, 14, 4), roof(-1, 15, 3), roof(1, 18, 3)], [{ x: -0.6, dz: 15 }]),
-      run(55, gates(12, '+3', '-2'), rider(26, 1.5, 3), rider(30, -1.5, 3), gates(44, '+2', '/2')),
+      run(55, gates(12, '+2', '-2'), rider(26, 1.5, 3), rider(30, -1.5, 3), gates(44, '+1', '/2')),
       fight([e('crate', -2.5, 11, 4), e('barrel', 0, 13, 3), e('trough', 2.5, 12, 4), roof(1, 16, 4)]),
       run(40, gates(14, '+2', '-1', '+3')),
       boss(40, [e('barrel', -2.5, 12, 3), e('crate', 2.5, 13, 3)], [{ x: 1.2, dz: 15 }]),
@@ -141,7 +141,7 @@ export const LEVELS: LevelDef[] = [
     seed: 67,
     par: 95,
     segments: [
-      run(60, gates(12, '+3', '+1'), rider(28, -2, 4), gates(42, '-2', 'x2'), crate(54, 2, 26, 'rifle')),
+      run(60, gates(12, '-2', 'x2'), rider(28, -2, 4), gates(42, '+2', '+1'), crate(54, 2, 26, 'rifle')),
       fight([e('barrel', -2.4, 12, 5), e('wagon', 1, 14, 5), roof(-1, 15, 5), roof(1, 17, 5)], [{ x: -1, dz: 15 }]),
       run(60, gates(12, '+2', '-3', '+3'), rider(26, 1, 4), rider(32, -1, 4), crate(46, 0, 30, 'shotgun')),
       fight([e('crate', -2.6, 11, 5, 'dynamite'), e('hay', 0, 12, 5), e('barrel', 2.6, 13, 5), roof(-1, 17, 5), roof(1, 16, 5)]),
@@ -169,7 +169,7 @@ export const LEVELS: LevelDef[] = [
     seed: 83,
     par: 105,
     segments: [
-      run(60, gates(12, '+3', '+2'), rider(26, -2, 5), crate(40, 1.8, 34, 'shotgun'), gates(52, '-3', 'x2')),
+      run(60, gates(12, '-3', 'x2'), rider(26, -2, 5), crate(40, 1.8, 34, 'shotgun'), gates(52, '+2', '+1')),
       fight([e('barrel', -2.6, 12, 6), e('wagon', 0.5, 14, 6), e('hay', 2.6, 11, 6), roof(-1, 16, 6), roof(1, 17, 6)], [{ x: -1.2, dz: 15 }]),
       run(60, gates(12, '+2', '/2', '+3'), rider(24, 1.5, 5), rider(28, -1.5, 5), crate(46, 0, 38, 'dynamite')),
       fight([e('crate', -2.4, 11, 6, 'dynamite'), e('trough', 0, 13, 6), e('barrel', 2.4, 12, 6), roof(1, 15, 6), roof(-1, 18, 6)]),
@@ -183,7 +183,7 @@ export const LEVELS: LevelDef[] = [
     seed: 97,
     par: 110,
     segments: [
-      run(65, gates(12, '+3', '-3'), rider(24, 0, 5), rider(28, 2, 5), crate(40, -1.6, 36, 'shotgun'), gates(54, 'x2', '+2')),
+      run(65, gates(12, 'x2', '+2'), rider(24, 0, 5), rider(28, 2, 5), crate(40, -1.6, 36, 'shotgun'), gates(54, '+2', '-3')),
       fight([e('barrel', -2.6, 11, 7), e('crate', 0, 12, 7, 'dynamite'), e('wagon', 2.2, 14, 7), roof(-1, 15, 7), roof(1, 17, 7)], [{ x: 1, dz: 13 }]),
       run(60, gates(12, '+2', '-2', '+3'), rider(26, -1.8, 6), crate(42, 1.8, 40, 'dynamite'), gates(54, '/2', '+3')),
       fight([e('hay', -2.6, 12, 7), e('trough', 0, 13, 7), e('barrel', 2.6, 11, 7, 'dynamite'), roof(-1, 16, 7), roof(1, 18, 7)], [{ x: -0.6, dz: 15 }]),
@@ -197,7 +197,7 @@ export const LEVELS: LevelDef[] = [
     seed: 101,
     par: 120,
     segments: [
-      run(65, gates(12, '+3', '-2'), rider(24, -1.5, 6), rider(28, 1.5, 6), crate(42, 0, 40, 'dynamite'), gates(56, 'x2', '-3')),
+      run(65, gates(12, 'x2', '-3'), rider(24, -1.5, 6), rider(28, 1.5, 6), crate(42, 0, 40, 'dynamite'), gates(56, '+2', '-2')),
       fight([e('barrel', -2.6, 11, 8), e('wagon', 0.5, 13, 8), e('crate', 2.6, 12, 8, 'dynamite'), roof(-1, 15, 8), roof(1, 17, 8)], [{ x: -1, dz: 14 }]),
       run(60, gates(12, '+3', '/2', '+2'), rider(26, 0, 6), crate(42, 1.8, 46, 'gatling'), gates(54, '+2', '-2')),
       fight([e('hay', -2.6, 12, 8), e('crate', 0, 11, 8, 'dynamite'), e('trough', 2.6, 13, 8), roof(-1, 16, 8), roof(1, 18, 8)], [{ x: 1.4, dz: 15 }]),
