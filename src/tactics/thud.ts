@@ -1,106 +1,86 @@
-import type { GroupId } from './units';
-
 const el = <T extends HTMLElement = HTMLElement>(html: string): T => {
   const t = document.createElement('template');
   t.innerHTML = html.trim();
   return t.content.firstElementChild as T;
 };
 
-export interface CardInfo {
-  id: GroupId;
-  name: string;
-  alive: number;
-  total: number;
-  hp: number; // 0..1 (sheriff)
-  ammo: string;
-  stance: 'fire' | 'hold';
-}
-
-/** Landscape HUD for the tactics mode. */
+/**
+ * Landscape HUD for the tactics mode:
+ * left thumb = aim pad (moves the on-screen crosshair), right thumb = FIRE (one tap = one shot),
+ * ◀ ▶ next to the sheriff slide him along his cover.
+ */
 export class TacticsHud {
   readonly root: HTMLElement;
   readonly aimPad: HTMLElement;
-  private cards = new Map<GroupId, HTMLElement>();
+  readonly fireBtn: HTMLButtonElement;
+  readonly slideL: HTMLButtonElement;
+  readonly slideR: HTMLButtonElement;
+  private cursor: HTMLElement;
   private top: HTMLElement;
-  private orders: HTMLElement;
-  private fireBtn: HTMLButtonElement;
-  private holdBtn: HTMLButtonElement;
-  private sheriffAmmo: HTMLElement;
+  private squads: HTMLElement;
+  private hp: HTMLElement;
+  private ammo: HTMLElement;
   private banner: HTMLElement;
   private bannerT = 0;
   private floaters: { el: HTMLElement; t: number; x: number; y: number }[] = [];
   private screen: HTMLElement;
   private rotate: HTMLElement;
-  onSelect: (g: GroupId) => void = () => {};
-  onStance: (s: 'fire' | 'hold') => void = () => {};
 
   constructor(parent: HTMLElement) {
     this.root = el(`<div class="tac"></div>`);
     parent.appendChild(this.root);
-    const cardsBox = el(`<div class="t-cards"></div>`);
-    for (const [id, name, cls] of [
-      ['S', 'ŠERIF', 'sheriff'],
-      ['A', 'SKUPINA A', 'a'],
-      ['B', 'SKUPINA B', 'b'],
-    ] as const) {
-      const c = el(`<button class="t-card ${cls}"><b>${name}</b><span class="dots"></span><small class="t-ammo"></small><i class="stance"></i></button>`);
-      c.addEventListener('pointerdown', (e) => {
-        e.stopPropagation();
-        this.onSelect(id);
-      });
-      this.cards.set(id, c);
-      cardsBox.appendChild(c);
-    }
     this.top = el(`<div class="t-top"></div>`);
-    this.orders = el(`<div class="t-orders"></div>`);
-    this.fireBtn = el<HTMLButtonElement>(`<button class="t-btn fire">PAĽBA</button>`);
-    this.holdBtn = el<HTMLButtonElement>(`<button class="t-btn hold">KRYT</button>`);
-    for (const [b, s] of [
-      [this.fireBtn, 'fire'],
-      [this.holdBtn, 'hold'],
-    ] as const)
-      b.addEventListener('pointerdown', (e) => {
-        e.stopPropagation();
-        this.onStance(s);
-      });
-    this.orders.append(this.fireBtn, this.holdBtn);
-    this.aimPad = el(`<div class="t-aimpad"><div class="knob"></div><span>MIER</span></div>`);
-    this.sheriffAmmo = el(`<div class="t-sammo"></div>`);
+    this.squads = el(`<div class="t-squads"></div>`);
+    this.hp = el(`<div class="t-hp"><b>ŠERIF</b><div class="bar"><em></em></div></div>`);
+    this.aimPad = el(`<div class="t-aimpad left"><div class="knob"></div><span>MIERENIE</span></div>`);
+    this.fireBtn = el<HTMLButtonElement>(`<button class="t-fire">PAĽ</button>`);
+    this.ammo = el(`<div class="t-sammo"></div>`);
+    this.slideL = el<HTMLButtonElement>(`<button class="t-slide hidden">◀</button>`);
+    this.slideR = el<HTMLButtonElement>(`<button class="t-slide hidden">▶</button>`);
+    this.cursor = el(`<div class="t-cursor"><i></i></div>`);
     this.banner = el(`<div class="t-banner hidden"></div>`);
     this.screen = el(`<div class="screen hidden"></div>`);
     this.rotate = el(`<div class="t-rotate hidden"><div>⟳</div><p>Otoč telefón na šírku</p></div>`);
-    this.root.append(cardsBox, this.top, this.orders, this.aimPad, this.sheriffAmmo, this.banner, this.screen, this.rotate);
-  }
-
-  setCards(cards: CardInfo[], selected: GroupId | null, ordersFor: GroupId | null): void {
-    for (const c of cards) {
-      const e = this.cards.get(c.id)!;
-      e.classList.toggle('sel', selected === c.id);
-      e.classList.toggle('dead', c.alive === 0);
-      const dots = c.id === 'S' ? `<em style="width:${Math.round(c.hp * 100)}%"></em>` : '●'.repeat(c.alive) + '○'.repeat(Math.max(0, c.total - c.alive));
-      const d = e.querySelector('.dots')!;
-      if (d.innerHTML !== dots) d.innerHTML = dots;
-      (e.querySelector(".t-ammo") as HTMLElement).textContent = c.ammo;
-      (e.querySelector('.stance') as HTMLElement).textContent = c.id === 'S' ? '' : c.stance === 'fire' ? 'PAĽBA' : 'KRYT';
-    }
-    this.orders.classList.toggle('hidden', !ordersFor || ordersFor === 'S');
-    const st = cards.find((c) => c.id === ordersFor)?.stance;
-    this.fireBtn.classList.toggle('on', st === 'fire');
-    this.holdBtn.classList.toggle('on', st === 'hold');
+    this.root.append(this.cursor, this.top, this.squads, this.hp, this.aimPad, this.fireBtn, this.ammo, this.slideL, this.slideR, this.banner, this.screen, this.rotate);
   }
 
   setTop(html: string): void {
     if (this.top.innerHTML !== html) this.top.innerHTML = html;
   }
 
-  setSheriffAmmo(text: string, urgent: boolean): void {
-    this.sheriffAmmo.textContent = text;
-    this.sheriffAmmo.classList.toggle('urgent', urgent);
+  setSquads(html: string): void {
+    if (this.squads.innerHTML !== html) this.squads.innerHTML = html;
+  }
+
+  setHp(frac: number): void {
+    (this.hp.querySelector('em') as HTMLElement).style.width = `${Math.max(0, frac) * 100}%`;
+  }
+
+  setAmmo(text: string, urgent: boolean): void {
+    this.ammo.textContent = text;
+    this.ammo.classList.toggle('urgent', urgent);
   }
 
   setPad(active: boolean, kx: number, ky: number): void {
     this.aimPad.classList.toggle('active', active);
     (this.aimPad.querySelector('.knob') as HTMLElement).style.transform = `translate(${kx}px, ${ky}px)`;
+  }
+
+  /** state: '' | 'lock' | 'head' */
+  setCursor(x: number, y: number, state: string, visible = true): void {
+    this.cursor.style.transform = `translate(${x}px, ${y}px)`;
+    this.cursor.className = `t-cursor ${state}${visible ? '' : ' hidden'}`;
+  }
+
+  setSlides(x: number, y: number, left: boolean, right: boolean): void {
+    this.slideL.classList.toggle('hidden', !left);
+    this.slideR.classList.toggle('hidden', !right);
+    this.slideL.style.transform = `translate(${x - 70}px, ${y - 22}px)`;
+    this.slideR.style.transform = `translate(${x + 26}px, ${y - 22}px)`;
+  }
+
+  firePressed(on: boolean): void {
+    this.fireBtn.classList.toggle('down', on);
   }
 
   showBanner(text: string, cls = '', t = 1.6): void {
@@ -133,10 +113,6 @@ export class TacticsHud {
       });
       bar.appendChild(e);
     }
-  }
-
-  closeScreen(): void {
-    this.screen.className = 'screen hidden';
   }
 
   update(dt: number): void {

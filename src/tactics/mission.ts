@@ -9,7 +9,7 @@ import { raycast, Hittable, HitPart } from '../game/hit';
 import { CoverObj, CoverSlot, generateMap, MapData, MapKind, MAP_GOALS } from './map';
 import { TB } from './tbalance';
 import { GroupId, Unit } from './units';
-import { TacticsHud, CardInfo } from './thud';
+import { TacticsHud } from './thud';
 
 export interface SquadMember {
   memberId: number;
@@ -109,23 +109,28 @@ export class Mission {
   /** Doctor upgrades raise the chance that a fallen man is only wounded. */
   woundedBonus = 0;
 
-  // selection / commands
-  selected: GroupId | null = null;
-  ordersFor: GroupId = 'A';
-  private selectT = 0;
+  // squads follow the sheriff
+  private squadT = 0;
+  private lastSheriffSlot: CoverSlot | null = null;
+  private rushT = 10;
   private rings = new Map<Unit, THREE.Mesh>();
   private marker: THREE.Mesh;
   private markerT = 0;
 
-  // sheriff aim
+  // sheriff aim: screen-space cursor moved by the left pad, FIRE = one shot per tap
   private aimId: number | null = null;
   private aimLast = new THREE.Vector2();
   private padCenter = new THREE.Vector2();
-  readonly cross = new THREE.Vector3(0, 0, 0);
+  /** Cursor in CSS pixels. */
+  readonly cursor = new THREE.Vector2(window.innerWidth / 2, window.innerHeight * 0.4);
   private crossMesh: THREE.Mesh;
   private aimLine: THREE.Mesh;
   private lock: Unit | null = null;
-  private lockT = 0;
+  private lockHead = false;
+  private readonly aimPoint = new THREE.Vector3();
+  private fireQueued = false;
+  /** Seconds the sheriff stays leaned out after a shot. */
+  private exposedT = 0;
   private sheriffReloadT = 0;
 
   // camera
@@ -183,16 +188,8 @@ export class Mission {
     }
     void NAMES;
     const Z = this.map.bounds.maxZ;
-    this.orderMove('S', new THREE.Vector3(0, 0, Z - 5));
-    this.orderMove('A', new THREE.Vector3(-6, 0, Z - 5));
-    this.orderMove('B', new THREE.Vector3(6, 0, Z - 5));
-    this.cross.set(0, 0, 0);
-
-    this.hud.onSelect = (g) => this.select(g);
-    this.hud.onStance = (s) => {
-      for (const u of this.units) if (u.alive && u.group === this.ordersFor) u.stance = s;
-      audio.play('click');
-    };
+    this.moveSheriffTo(new THREE.Vector3(0, 0, Z - 5));
+    this.squadT = 0.2;
     this.bindInput(view.renderer.domElement);
     this.hud.showBanner(`${def.name.toUpperCase()}<br><small>${MAP_GOALS[def.mapKind ?? 'plaza']}</small>`, '', 2.4);
   }
@@ -216,19 +213,6 @@ export class Mission {
   // =====================================================================
   // Orders
   // =====================================================================
-  select(g: GroupId): void {
-    audio.unlock();
-    if (!this.units.some((u) => u.alive && u.group === g)) return;
-    if (this.selected === g) {
-      this.selected = null;
-      return;
-    }
-    this.selected = g;
-    if (g !== 'S') this.ordersFor = g;
-    this.selectT = TB.commandTimeout;
-    audio.play('click');
-  }
-
   private enemyCentroid(): THREE.Vector3 {
     const c = new THREE.Vector3();
     let n = 0;
@@ -255,9 +239,91 @@ export class Mission {
       if (s) cand.splice(cand.findIndex((c) => c.s === s), 1);
       u.goTo(this.map.nav.path(u.pos, dest), s);
     });
-    this.marker.position.set(point.x, 0.04, point.z);
-    (this.marker.material as THREE.MeshBasicMaterial).color.setHex(GROUP_COLOR[g]);
+  }
+
+  /** Sheriff runs to the free cover slot nearest to `p` (or to `p` itself). */
+  private moveSheriffTo(p: THREE.Vector3, slot?: CoverSlot | null): void {
+    const s = this.sheriff;
+    const threat = this.enemyCentroid();
+    let best = slot ?? null;
+    if (!best) {
+      let bd = 3.2;
+      for (const sl of this.map.slots) {
+        if (!(sl.free || sl.occupant === s || sl.reserved === s)) continue;
+        const d = sl.pos.distanceTo(p) - (sl.protects(threat) ? 0.6 : 0);
+        if (d < bd) {
+          bd = d;
+          best = sl;
+        }
+      }
+    }
+    const dest = best ? best.pos.clone() : p.clone();
+    this.clampToMap(dest);
+    s.goTo(this.map.nav.path(s.pos, dest), best);
+    this.exposedT = 0;
+    this.marker.position.set(dest.x, 0.04, dest.z);
+    (this.marker.material as THREE.MeshBasicMaterial).color.setHex(GROUP_COLOR.S);
     this.markerT = 1;
+    this.squadT = 0.15; // squads react right away
+  }
+
+  /** Slide along the current cover: next slot on the same side, left (-1) or right (+1) on screen. */
+  private slideNeighbour(dir: -1 | 1): CoverSlot | null {
+    const s = this.sheriff;
+    const cur = s.slot;
+    if (!cur || s.moving) return null;
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.view.camera.quaternion).setY(0).normalize();
+    let best: CoverSlot | null = null;
+    let bd = Infinity;
+    for (const sl of cur.cover.slots) {
+      if (sl === cur || !(sl.free || sl.reserved === s)) continue;
+      const off = sl.pos.clone().sub(cur.pos);
+      const side = off.dot(right);
+      if (side * dir <= 0.2) continue;
+      const d = off.length();
+      if (d < bd) {
+        bd = d;
+        best = sl;
+      }
+    }
+    return best;
+  }
+
+  /** Squads A (left) and B (right) take covers around the sheriff, facing the bandits. */
+  private squadFollow(): void {
+    const s = this.sheriff;
+    if (!s.alive) return;
+    const anchor = s.slot ? s.slot.pos : s.path.length ? s.path[s.path.length - 1] : s.pos;
+    const threat = this.enemyCentroid();
+    const fwd = threat.clone().sub(anchor).setY(0);
+    if (fwd.lengthSq() < 0.01) fwd.set(0, 0, -1);
+    fwd.normalize();
+    const left = new THREE.Vector3(fwd.z, 0, -fwd.x); // 90° to the left of "forward"
+    for (const g of ['A', 'B'] as const) {
+      const squad = this.units.filter((u) => u.alive && u.group === g);
+      if (!squad.length) continue;
+      const side = g === 'A' ? 1 : -1;
+      const ok = squad.every((u) => {
+        const dest = u.slot ? u.slot.pos : u.pos;
+        const d = dest.distanceTo(anchor);
+        return d > 1.5 && d < 8 && (!u.slot || u.slot.protects(threat)) && (u.slot || u.moving);
+      });
+      if (ok && this.lastSheriffSlot === s.slot) continue;
+      const centre = anchor.clone().addScaledVector(left, side * 3.6).addScaledVector(fwd, -0.5);
+      for (const u of squad) u.leaveSlot();
+      const cand = this.map.slots
+        .filter((sl) => sl.free && sl.pos.distanceTo(anchor) > 1.4 && sl.pos.distanceTo(centre) < 5)
+        .map((sl) => ({ sl, score: sl.pos.distanceTo(centre) - (sl.protects(threat) ? 3 : 0) }))
+        .sort((a, b) => a.score - b.score);
+      squad.forEach((u, i) => {
+        const pick = cand[i]?.sl ?? null;
+        const dest = pick ? pick.pos.clone() : centre.clone().addScaledVector(left, side * i * 0.9);
+        this.clampToMap(dest);
+        if (u.pos.distanceTo(dest) < 0.3 && u.slot === pick) return;
+        u.goTo(this.map.nav.path(u.pos, dest), pick);
+      });
+    }
+    this.lastSheriffSlot = s.slot;
   }
 
   private clampToMap(p: THREE.Vector3): void {
@@ -286,22 +352,14 @@ export class Mission {
       const r = pad.getBoundingClientRect();
       this.padCenter.set(r.left + r.width / 2, r.top + r.height / 2);
       this.aimLast.set(e.clientX, e.clientY);
-      // start the crosshair on the nearest visible bandit
-      if (!this.lock || !this.lock.alive) {
-        const t = this.nearestEnemy(this.sheriff.pos);
-        if (t) this.cross.copy(t.pos);
-      }
     });
     pad.addEventListener('pointermove', (e) => {
       if (this.disposed || e.pointerId !== this.aimId) return;
       const dx = e.clientX - this.aimLast.x;
       const dy = e.clientY - this.aimLast.y;
       this.aimLast.set(e.clientX, e.clientY);
-      const cam = this.view.camera;
-      const right = tmp.set(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();
-      const fwd = tmp2.set(0, 0, -1).applyQuaternion(cam.quaternion).setY(0).normalize();
-      this.cross.addScaledVector(right, dx * TB.aimPadSensitivity).addScaledVector(fwd, -dy * TB.aimPadSensitivity);
-      this.clampToMap(this.cross);
+      this.cursor.x = THREE.MathUtils.clamp(this.cursor.x + dx * TB.aimPadGain, 0, window.innerWidth);
+      this.cursor.y = THREE.MathUtils.clamp(this.cursor.y + dy * TB.aimPadGain, 0, window.innerHeight);
       const kx = THREE.MathUtils.clamp(e.clientX - this.padCenter.x, -40, 40);
       const ky = THREE.MathUtils.clamp(e.clientY - this.padCenter.y, -40, 40);
       this.hud.setPad(true, kx, ky);
@@ -314,9 +372,41 @@ export class Mission {
     pad.addEventListener('pointerup', padUp);
     pad.addEventListener('pointercancel', padUp);
 
+    const fire = this.hud.fireBtn;
+    fire.addEventListener('pointerdown', (e) => {
+      if (this.disposed) return;
+      e.stopPropagation();
+      e.preventDefault();
+      audio.unlock();
+      this.fireQueued = true;
+      this.hud.firePressed(true);
+    });
+    const fireUp = () => this.hud.firePressed(false);
+    fire.addEventListener('pointerup', fireUp);
+    fire.addEventListener('pointercancel', fireUp);
+    fire.addEventListener('pointerleave', fireUp);
+
+    for (const [btn, dir] of [
+      [this.hud.slideL, -1],
+      [this.hud.slideR, 1],
+    ] as const)
+      btn.addEventListener('pointerdown', (e) => {
+        if (this.disposed) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const sl = this.slideNeighbour(dir);
+        if (sl) this.moveSheriffTo(sl.pos, sl);
+      });
+
     canvas.addEventListener('pointerdown', (e) => {
       if (this.disposed) return;
       audio.unlock();
+      if (e.pointerType === 'mouse') {
+        // PC: left click = shoot, right click = move
+        if (e.button === 0) this.fireQueued = true;
+        else if (e.button === 2) this.tap(e.clientX, e.clientY);
+        return;
+      }
       if (this.mapId !== null) return;
       this.mapId = e.pointerId;
       this.mapStart.set(e.clientX, e.clientY);
@@ -324,7 +414,12 @@ export class Mission {
       this.mapMoved = false;
     });
     canvas.addEventListener('pointermove', (e) => {
-      if (this.disposed || e.pointerId !== this.mapId) return;
+      if (this.disposed) return;
+      if (e.pointerType === 'mouse') {
+        this.cursor.set(e.clientX, e.clientY);
+        return;
+      }
+      if (e.pointerId !== this.mapId) return;
       if (Math.hypot(e.clientX - this.mapStart.x, e.clientY - this.mapStart.y) > 12) this.mapMoved = true;
       if (this.mapMoved) {
         const k = this.view.camera.position.distanceTo(this.camTarget) / window.innerHeight;
@@ -344,9 +439,15 @@ export class Mission {
     canvas.addEventListener('pointercancel', () => (this.mapId = null));
     window.addEventListener('keydown', (e) => {
       if (this.disposed) return;
-      if (e.key === '1') this.select('S');
-      if (e.key === '2') this.select('A');
-      if (e.key === '3') this.select('B');
+      if (e.key === ' ') this.fireQueued = true;
+      if (e.key === 'a' || e.key === 'ArrowLeft') {
+        const sl = this.slideNeighbour(-1);
+        if (sl) this.moveSheriffTo(sl.pos, sl);
+      }
+      if (e.key === 'd' || e.key === 'ArrowRight') {
+        const sl = this.slideNeighbour(1);
+        if (sl) this.moveSheriffTo(sl.pos, sl);
+      }
     });
   }
 
@@ -357,30 +458,13 @@ export class Mission {
     return ray.ray.intersectPlane(ground, p) ? p : null;
   }
 
+  /** Tap on the map = sheriff runs to the nearest cover there. */
   private tap(x: number, y: number): void {
     const p = this.screenToGround(x, y);
-    if (!p) return;
-    // tapping one of our men selects his group
-    let best: Unit | null = null;
-    let bd = 1.2;
-    for (const u of this.units) {
-      if (!u.alive || u.side !== 'player') continue;
-      const d = u.pos.distanceTo(p);
-      if (d < bd) {
-        bd = d;
-        best = u;
-      }
-    }
-    if (best && (!this.selected || this.selected === best.group)) {
-      this.select(best.group);
-      return;
-    }
-    if (this.selected) {
-      this.clampToMap(p);
-      this.orderMove(this.selected, p);
-      audio.play('click');
-      this.selected = null;
-    }
+    if (!p || !this.sheriff.alive) return;
+    this.clampToMap(p);
+    this.moveSheriffTo(p);
+    audio.play('click');
   }
 
   // =====================================================================
@@ -625,6 +709,12 @@ export class Mission {
         u.timer -= dt;
         if (u.timer <= 0) {
           if (u.side === 'enemy') {
+            // coordination: only a couple of bandits shoot at the same time
+            const active = this.units.filter((e) => e.alive && e.side === 'enemy' && (e.state === 'warn' || e.state === 'peek')).length;
+            if (active >= TB.maxEnemyShooters) {
+              u.timer = 0.3 + Math.random() * 0.4;
+              break;
+            }
             u.state = 'warn';
             u.timer = TB.enemyTelegraph;
           } else {
@@ -664,23 +754,31 @@ export class Mission {
   /** Bandit decisions: pick and change cover. */
   private enemyThink(u: Unit, dt: number): void {
     u.repoT -= dt;
+    u.stayT += dt;
     const players = this.units.filter((p) => p.alive && p.side === 'player');
     if (!players.length) return;
     let near = players[0];
     for (const p of players) if (p.pos.distanceTo(u.pos) < near.pos.distanceTo(u.pos)) near = p;
-    const bad = !u.slot || !u.slot.cover.alive || !u.slot.protects(near.pos);
-    if (!(u.repoT <= 0 || (bad && u.state === 'cover'))) return;
-    if (u.state === 'peek' || u.state === 'warn') return;
-    u.repoT = TB.enemyReposition * (0.7 + Math.random() * 0.6);
     const pc = new THREE.Vector3();
     for (const p of players) pc.add(p.pos);
     pc.divideScalar(players.length);
+    // re-think only after a minimum stay (no running back and forth); cover gone = leave now
+    const lost = !u.slot || !u.slot.cover.alive;
+    const exposed = !lost && !u.slot!.protects(pc) && !u.slot!.protects(near.pos);
+    const rusher = u.rush;
+    if (!(lost || u.repoT <= 0 || (exposed && u.stayT > TB.enemyMinStay))) return;
+    if (u.state === 'peek' || u.state === 'warn') return;
+    u.repoT = TB.enemyReposition * (0.7 + Math.random() * 0.6);
+    u.stayT = 0;
+    u.rush = false;
     let best: CoverSlot | null = null;
     let bs = -Infinity;
     for (const s of this.map.slots) {
       if (!(s.free || s.occupant === u || s.reserved === u)) continue;
       const dp = s.pos.distanceTo(pc);
-      let score = (s.protects(near.pos) ? 10 : -8) - Math.abs(dp - TB.enemyPreferDist) * 0.8 - s.pos.distanceTo(u.pos) * 0.25 + Math.random() * 2.5;
+      const want = rusher ? TB.enemyRushDist : TB.enemyPreferDist;
+      let score = (s.protects(near.pos) ? 10 : -8) + (s.protects(pc) ? 4 : 0) - Math.abs(dp - want) * 0.8 - s.pos.distanceTo(u.pos) * (rusher ? 0.05 : 0.35) + Math.random() * 1.5;
+      if (s === u.slot) score += 3; // prefer to stay
       if (s.pos.z > pc.z - 4) score -= 20;
       if (score > bs) {
         bs = score;
@@ -693,72 +791,101 @@ export class Mission {
     }
   }
 
+  /** What the screen cursor points at: a bandit's head/body (with snapping) or the ground. */
+  private updateAimTarget(): void {
+    const cam = this.view.camera;
+    let lock: Unit | null = null;
+    let head = false;
+    let bd = TB.aimSnapPx;
+    const hp = new THREE.Vector3();
+    const toScreen = (v: THREE.Vector3) => {
+      const q = v.clone().project(cam);
+      return new THREE.Vector2(((q.x + 1) / 2) * window.innerWidth, ((1 - q.y) / 2) * window.innerHeight);
+    };
+    for (const u of this.units) {
+      if (!u.alive || u.side !== 'enemy') continue;
+      u.c.headCenter(hp);
+      const hs = toScreen(hp);
+      const body = u.pos.clone().setY(u.exposed ? 1.0 : 0.65);
+      const bs = toScreen(body);
+      const dh = hs.distanceTo(this.cursor);
+      const db = bs.distanceTo(this.cursor);
+      if (dh < TB.headSnapPx && dh < bd) {
+        bd = dh;
+        lock = u;
+        head = true;
+      } else if (db < bd) {
+        bd = db;
+        lock = u;
+        head = false;
+      }
+    }
+    this.lock = lock;
+    this.lockHead = head;
+    if (lock) {
+      if (head) lock.c.headCenter(this.aimPoint);
+      else this.aimPoint.copy(lock.pos).setY(lock.exposed ? 1.0 : 0.65);
+    } else {
+      const g = this.screenToGround(this.cursor.x, this.cursor.y);
+      if (g) this.aimPoint.copy(g).setY(0.6);
+    }
+    this.hud.setCursor(this.cursor.x, this.cursor.y, lock ? (head ? 'head' : 'lock') : '', this.phase === 'play');
+  }
+
   private updateSheriff(dt: number, realDt: number): void {
     const s = this.sheriff;
     if (!s.alive) return;
-    const aiming = this.aimId !== null;
-    this.crossMesh.visible = aiming;
-    this.aimLine.visible = aiming && !s.moving;
-    if (this.moveUnit(s, dt)) return;
-    // snap the crosshair to the nearest bandit
-    let lock: Unit | null = null;
-    let ld = TB.aimSnap;
-    for (const u of this.units) {
-      if (!u.alive || u.side !== 'enemy') continue;
-      const d = u.pos.distanceTo(this.cross);
-      if (d < ld) {
-        ld = d;
-        lock = u;
-      }
+    this.updateAimTarget();
+    this.crossMesh.visible = false;
+    s.fireT -= realDt;
+    if (this.moveUnit(s, dt)) {
+      this.aimLine.visible = false;
+      this.fireQueued = false;
+      return;
     }
-    if (lock !== this.lock) {
-      this.lock = lock;
-      this.lockT = 0;
+    const aimPoint = this.aimPoint;
+    if (this.fireQueued) {
+      this.fireQueued = false;
+      if (s.fireT <= 0 && s.mag > 0) {
+        this.exposedT = TB.sheriffExposeTime;
+        s.state = 'peek';
+        s.c.pose = 'aim';
+        this.face(s, aimPoint);
+        s.c.update(0.001);
+        const m = this.muzzle(s, new THREE.Vector3());
+        this.sheriffShoot(m, aimPoint);
+        s.mag--;
+        s.fireT = s.w.interval;
+        this.sheriffReloadT = -TB.sheriffReloadDelay;
+      } else if (s.mag === 0) audio.play('empty', 0.2);
     }
-    if (lock && aiming) this.lockT += realDt;
-    const aimPoint = new THREE.Vector3();
-    if (lock) {
-      if (this.lockT > TB.sheriffHeadAimTime) lock.c.headCenter(aimPoint);
-      else aimPoint.copy(lock.pos).setY(lock.inCover && !lock.exposed ? 0.7 : 1.05);
-    } else aimPoint.copy(this.cross).setY(1.0);
-    (this.crossMesh.material as THREE.MeshBasicMaterial).color.setHex(lock ? (this.lockT > TB.sheriffHeadAimTime ? 0xffd040 : 0xff4a3a) : 0xffffff);
-    this.crossMesh.position.set(lock ? lock.pos.x : this.cross.x, 0.05, lock ? lock.pos.z : this.cross.z);
-    this.crossMesh.scale.setScalar(lock && this.lockT > TB.sheriffHeadAimTime ? 0.7 : 1);
-
-    if (aiming) {
+    this.exposedT -= realDt;
+    if (this.exposedT > 0) {
       s.state = 'peek';
       s.c.pose = 'aim';
       this.face(s, aimPoint);
       s.c.aimPitch = Math.atan2(aimPoint.y - 1.45, Math.hypot(aimPoint.x - s.pos.x, aimPoint.z - s.pos.z));
       const m = this.muzzle(s, new THREE.Vector3());
+      this.aimLine.visible = true;
       this.aimLine.position.copy(m);
       this.aimLine.lookAt(aimPoint);
-      this.aimLine.scale.set(0.04, 0.04, m.distanceTo(aimPoint));
-      s.fireT -= realDt;
-      if (s.fireT <= 0) {
-        if (s.mag > 0) {
-          this.sheriffShoot(m, aimPoint);
-          s.mag--;
-          s.fireT = s.w.interval;
-        } else {
-          audio.play('empty', 0.3);
-          s.fireT = 0.3;
-        }
-      }
-      this.sheriffReloadT = 0;
-    } else {
-      s.state = 'cover';
-      if (s.mag < s.w.mag && s.reserve > 0) {
-        s.c.pose = 'reload';
-        this.sheriffReloadT += dt;
-        if (this.sheriffReloadT > (s.w.reload / s.w.mag) * (1 - 0.15 * this.def.sheriff.reload)) {
-          this.sheriffReloadT = 0;
-          s.mag++;
-          s.reserve--;
-          audio.play('reload', 0.08);
-        }
-      } else s.c.pose = s.inCover ? 'crouch' : 'idle';
+      this.aimLine.scale.set(0.035, 0.035, m.distanceTo(aimPoint));
+      return;
     }
+    this.aimLine.visible = false;
+    s.state = 'cover';
+    // face the cursor target while hidden so the lean-out is quick
+    if (this.lock) this.face(s, aimPoint);
+    if (s.mag < s.w.mag && s.reserve > 0) {
+      this.sheriffReloadT += dt;
+      if (this.sheriffReloadT > 0) s.c.pose = 'reload';
+      if (this.sheriffReloadT > (s.w.reload / s.w.mag) * (1 - 0.15 * this.def.sheriff.reload)) {
+        this.sheriffReloadT = 0;
+        s.mag++;
+        s.reserve--;
+        audio.play('reload', 0.08);
+      }
+    } else s.c.pose = s.inCover ? 'crouch' : 'idle';
   }
 
   private sheriffShoot(m: THREE.Vector3, aimPoint: THREE.Vector3): void {
@@ -823,15 +950,27 @@ export class Mission {
 
   update(rawDt: number): void {
     this.hud.setRotateHint(window.innerHeight > window.innerWidth);
-    if (this.selected) {
-      this.selectT -= rawDt;
-      if (this.selectT <= 0) this.selected = null;
-    }
-    const ts = this.selected && this.phase === 'play' ? TB.commandSlowMo : this.phase === 'play' ? 1 : 0.4;
-    const dt = rawDt * ts;
+    const dt = rawDt * (this.phase === 'play' ? 1 : 0.4);
     if (this.phase === 'play') {
       this.time += dt;
       this.spawnWaves();
+      this.squadT -= dt;
+      if (this.squadT <= 0) {
+        this.squadT = 2;
+        this.squadFollow();
+      }
+      // now and then a bandit rushes closer (exposed while running)
+      this.rushT -= dt;
+      if (this.rushT <= 0) {
+        this.rushT = TB.enemyRushEvery * (0.7 + Math.random() * 0.6);
+        const cands = this.units.filter((u) => u.alive && u.side === 'enemy' && u.state === 'cover' && !u.moving);
+        const r = cands[Math.floor(Math.random() * cands.length)];
+        if (r) {
+          r.rush = true;
+          r.repoT = 0;
+          r.stayT = 99;
+        }
+      }
     }
     for (const u of this.units) {
       if (!u.alive) continue;
@@ -849,9 +988,8 @@ export class Mission {
       const ring = this.rings.get(u);
       if (ring) {
         ring.position.set(u.pos.x, 0.03, u.pos.z);
-        const sel = this.selected === u.group;
-        ring.scale.setScalar(sel ? 1.25 + Math.sin(this.time * 18) * 0.08 : 1);
-        (ring.material as THREE.MeshBasicMaterial).opacity = sel ? 1 : 0.55;
+        ring.scale.setScalar(u.group === 'S' ? 1.2 : 1);
+        (ring.material as THREE.MeshBasicMaterial).opacity = u.group === 'S' ? 0.95 : 0.5;
       }
     }
     if (this.markerT > 0) {
@@ -893,25 +1031,22 @@ export class Mission {
 
   private updateHud(dt: number): void {
     this.hud.update(dt);
-    const cards: CardInfo[] = (['S', 'A', 'B'] as GroupId[]).map((g) => {
+    const sq = (g: 'A' | 'B') => {
       const all = this.units.filter((u) => u.group === g);
       const alive = all.filter((u) => u.alive);
-      const ammo = alive.reduce((a, u) => a + u.mag + u.reserve, 0);
-      return {
-        id: g,
-        name: g,
-        alive: alive.length,
-        total: all.length,
-        hp: g === 'S' ? Math.max(0, this.sheriff.hp / this.sheriff.maxHp) : 1,
-        ammo: g === 'S' ? '' : `náboje ${ammo}`,
-        stance: alive[0]?.stance ?? 'fire',
-      };
-    });
-    this.hud.setCards(cards, this.selected, this.ordersFor);
+      return `<span class="${g.toLowerCase()}">${g} ${'●'.repeat(alive.length)}${'○'.repeat(all.length - alive.length)}</span>`;
+    };
+    this.hud.setSquads(`${sq('A')} &nbsp; ${sq('B')}`);
     const s = this.sheriff;
-    this.hud.setSheriffAmmo(`${s.mag}/${s.w.mag} · ${s.reserve}`, s.mag === 0);
+    this.hud.setHp(s.hp / s.maxHp);
+    this.hud.setAmmo(`${s.mag}/${s.w.mag} · ${s.reserve}`, s.mag === 0);
     const enemies = this.units.filter((u) => u.alive && u.side === 'enemy').length;
-    this.hud.setTop(`${this.def.name} · vlna ${Math.max(1, this.waveIdx)}/${this.def.waves.length} · bandity: ${enemies}${this.selected ? ' · <span style="color:#ffd060">ťukni, kam ísť</span>' : ''}`);
+    this.hud.setTop(`${this.def.name} · vlna ${Math.max(1, this.waveIdx)}/${this.def.waves.length} · bandity: ${enemies}`);
+    // ◀ ▶ next to the sheriff when he can slide along his cover
+    tmp.copy(s.pos).setY(1.0).project(this.view.camera);
+    const x = ((tmp.x + 1) / 2) * window.innerWidth, y = ((1 - tmp.y) / 2) * window.innerHeight;
+    const can = s.alive && !s.moving && this.phase === 'play';
+    this.hud.setSlides(x, y, can && !!this.slideNeighbour(-1), can && !!this.slideNeighbour(1));
   }
 
   /** Remove everything this mission added to the scene and the UI. */

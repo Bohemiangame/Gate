@@ -34,6 +34,10 @@ export class Unit {
   targetT = 0;
   /** AI: time until the bandit looks for a better cover. */
   repoT = 3 + Math.random() * 4;
+  /** AI: time spent in the current cover. */
+  stayT = 0;
+  /** AI: this bandit is rushing forward. */
+  rush = false;
   warn: Label | null = null;
   readonly facing = new THREE.Vector3(0, 0, -1);
 

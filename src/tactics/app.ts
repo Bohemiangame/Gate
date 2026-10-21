@@ -387,17 +387,19 @@ export class TacticsApp {
     const c = this.c;
     autoSquads(c);
     const men = c.roster.filter((m) => m.squad && m.wounded === 0);
+    // the sheriff packs his ammo first
+    const sheriffAmmo = Math.min(SHERIFF_CARRY, c.ammo.r45);
+    c.ammo.r45 -= sheriffAmmo;
     const squads: SquadMember[] = men.map((m) => {
       const t = AMMO_OF[m.weapon];
       const take = Math.min(CARRY[t], c.ammo[t]);
       c.ammo[t] -= take;
       return { memberId: m.id, group: m.squad!, name: m.name, weapon: m.weapon, variant: m.variant, reserve: take };
     });
-    const sheriffAmmo = Math.min(SHERIFF_CARRY, c.ammo.r45);
-    c.ammo.r45 -= sheriffAmmo;
     const n = c.mission + 1;
     const mw = missionWaves(n);
     this.clear();
+    this.batcher.sync(); // empty the town's instanced meshes (no frozen people in the mission)
     this.mode = 'mission';
     const before = new Set(c.roster.filter((m) => m.wounded > 0).map((m) => m.id));
     const kinds: MapKind[] = ['plaza', 'plaza', 'desert', 'rail'];

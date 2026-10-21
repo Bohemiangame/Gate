@@ -186,3 +186,28 @@ html, body {
 .h-panel h2 { font-size: 16px; }
 .h-result { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 380px; max-width: 80%; pointer-events: auto; }
 .h-result h1 { font-size: 26px; }
+
+/* ---------- Tactics HUD v2: aim pad left, fire right ---------- */
+.t-aimpad.left { right: auto; left: calc(env(safe-area-inset-left) + 22px); }
+.t-fire {
+  position: absolute; right: calc(env(safe-area-inset-right) + 26px); bottom: calc(env(safe-area-inset-bottom) + 22px);
+  width: 112px; height: 112px; border-radius: 50%; border: 4px solid #3a1408; color: #fff; font-size: 24px; font-weight: 900;
+  background: radial-gradient(circle at 40% 35%, #f0803a, #a8300e); box-shadow: 0 5px 0 #4a1404; text-shadow: 0 2px 0 #4a1404; touch-action: none;
+}
+.t-fire.down { transform: translateY(4px) scale(0.96); box-shadow: 0 1px 0 #4a1404; }
+.tac .t-sammo { right: calc(env(safe-area-inset-right) + 150px); bottom: calc(env(safe-area-inset-bottom) + 28px); }
+.t-slide { position: absolute; left: 0; top: 0; width: 44px; height: 44px; border-radius: 50%; border: 3px solid #2a1408; background: rgba(255,230,180,0.85); color: #3a1408; font-size: 18px; font-weight: 900; }
+.t-cursor { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; }
+.t-cursor i { position: absolute; left: -16px; top: -16px; width: 26px; height: 26px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0,0,0,0.5); }
+.t-cursor i::before, .t-cursor i::after { content: ''; position: absolute; background: #fff; }
+.t-cursor i::before { left: 11px; top: -9px; width: 4px; height: 44px; clip-path: polygon(0 0,100% 0,100% 30%,0 30%,0 70%,100% 70%,100% 100%,0 100%); }
+.t-cursor i::after { top: 11px; left: -9px; height: 4px; width: 44px; clip-path: polygon(0 0,30% 0,30% 100%,0 100%,70% 0,100% 0,100% 100%,70% 100%); }
+.t-cursor.lock i { border-color: #ff4a3a; }
+.t-cursor.lock i::before, .t-cursor.lock i::after { background: #ff4a3a; }
+.t-cursor.head i { border-color: #ffd040; transform: scale(0.8); }
+.t-cursor.head i::before, .t-cursor.head i::after { background: #ffd040; }
+.t-squads { position: absolute; left: calc(env(safe-area-inset-left) + 12px); top: calc(env(safe-area-inset-top) + 8px); font-weight: 900; font-size: 13px; color: #fff3d8; text-shadow: 0 1px 0 #000; background: rgba(40,22,10,0.6); padding: 4px 10px; border-radius: 10px; }
+.t-squads .a { color: #8ab8ff; } .t-squads .b { color: #8affb8; }
+.t-hp { position: absolute; right: calc(env(safe-area-inset-right) + 12px); top: calc(env(safe-area-inset-top) + 8px); width: 130px; font-size: 12px; color: #ffd860; text-shadow: 0 1px 0 #000; }
+.t-hp .bar { height: 9px; border-radius: 5px; background: rgba(40,10,8,0.7); border: 2px solid #2a1408; overflow: hidden; }
+.t-hp em { display: block; height: 100%; background: linear-gradient(#8aff7a, #3aa82a); }

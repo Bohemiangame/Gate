@@ -97,3 +97,12 @@ viac pokusov a nákupy v obchode. Generované levely 11+ sú pre priemerného hr
 - **Železnica**: koľaje naprieč mapou s nákladnými vagónmi (vysoký nezničiteľný kryt, medzi nimi priechody), vodná veža, stanica a domy na našej strane, banda prichádza z prérie za vlakom.
 - Poradie: misie 1–2 Námestie, 3 Pustatina, 4 Železnica, ďalej sa striedajú; každá misia má nový náhodný seed. Náročnosť rastie s číslom misie (viac vĺn, väčšie vlny, viac pušiek, vyššie HP).
 - **Vyváženie taktického režimu ešte nie je doladené** – zatiaľ len odhad. Testovacie behy bez zásahu hráča (šerif nestrieľa) končili raz výhrou, raz prehrou, takže s aktívnym šerifom by misia 1 mala byť zvládnuteľná. Čakám na spätnú väzbu z hrania na telefóne.
+
+## Krok 5 – nové ovládanie podľa testu na telefóne
+- **Opravené**: zamrznutá skupina v strede misie (zostatok vykresľovača z mestečka), šerif bez nábojov (teraz si berie muníciu zo skladu ako prvý), bandita pobehujúci medzi krytmi (musí v kryte zostať aspoň 4 s, preferuje zostať, kryt hodnotí podľa celej našej skupiny), posunutý zameriavač.
+- **Zameriavač je bod na obrazovke** (nie na zemi). Strela ide presne tam, kam ukazuje; prichytí sa na telo bandity do 34 px, na hlavu do 12 px (zožltne = 2× poškodenie).
+- **Ľavý palec = mieriaca plocha** (posúva zameriavač, aj keď je šerif v kryte). **Pravý palec = PAĽ: každý ťuk = jedna rana** (nič automatické), šerif sa vykloní na 0,6 s a potom sa sám skryje; nabíjať začne 0,8 s po poslednej rane.
+- **Presun šerifa**: ťuk na mapu → prebehne do najbližšieho krytu pri mieste ťuku. **◀ ▶ pri šerifovi** = posun pozdĺž toho istého krytu (napr. na druhý roh voza).
+- **Skupiny sú len AI**: skupina A si berie kryty naľavo, B napravo od šerifa (smerom k bande), do ~4 m; keď sa šerif presunie, idú za ním. Karty a rozkazy PAĽBA/KRYT sú preč.
+- **Rytmus banditov**: naraz mieria/strieľajú najviac 2 (v teste ~25 % času nestrieľa nikto), dlhšie pauzy medzi vykuknutiami (0,9–2 s), každých ~14 s jeden bandita vybehne bližšie (je vtedy odkrytý).
+- PC: myš = zameriavač, ľavé tlačidlo = rana, pravé = presun, A/D = posun pozdĺž krytu, medzerník = rana.

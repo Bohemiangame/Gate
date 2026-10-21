@@ -29,8 +29,15 @@ export const TB = {
   sheriffAccSpread: 0.035,
   /** Holding the aim on one bandit this long moves the aim to the head. */
   sheriffHeadAimTime: 0.7,
-  aimPadSensitivity: 0.05, // metres per CSS px of drag
-  aimSnap: 1.3, // snap radius (m) to the nearest bandit
+  /** Cursor moves this many screen px per px of thumb movement on the aim pad. */
+  aimPadGain: 1.7,
+  /** Cursor snaps to a bandit's body within this many px, to the head within headSnapPx. */
+  aimSnapPx: 34,
+  headSnapPx: 12,
+  /** Sheriff stays leaned out this long after each shot. */
+  sheriffExposeTime: 0.6,
+  /** Reloading starts this long after the last shot. */
+  sheriffReloadDelay: 0.8,
 
   // posse
   posseHp: 3,
@@ -46,8 +53,15 @@ export const TB = {
   rangeFalloff: 0.45,
 
   // AI
-  peekDelayMin: 0.5,
-  peekDelayMax: 1.4,
+  peekDelayMin: 0.9,
+  peekDelayMax: 2.0,
+  /** At most this many bandits aim/shoot at the same moment. */
+  maxEnemyShooters: 2,
+  /** A bandit has to stay in a cover at least this long before he may move again (unless it is destroyed). */
+  enemyMinStay: 4,
+  /** Every ~N seconds one bandit rushes to a closer cover. */
+  enemyRushEvery: 14,
+  enemyRushDist: 6,
   shotsPerPeek: 2,
   enemyTelegraph: 0.6,
   enemyHp: 3,
