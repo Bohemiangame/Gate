@@ -300,3 +300,68 @@ export function buildWantedBoard(): PropModel {
 export function buildSandbags(width = 3): PropModel {
   return buildBarricade(width);
 }
+
+/** Desert boulder. `big` = taller than a man (blocks line of sight). */
+export function buildRock(seed: number, big = false): PropModel {
+  const r = rng(seed * 31 + 5);
+  const sx = big ? 18 + Math.floor(r() * 6) : 10 + Math.floor(r() * 5);
+  const sy = big ? 18 + Math.floor(r() * 4) : 8 + Math.floor(r() * 3);
+  const sz = big ? 14 + Math.floor(r() * 5) : 9 + Math.floor(r() * 4);
+  const g = new VoxelGrid(sx, sy, sz);
+  const base = [0xa8826a, 0x9a7460, 0xb89478][Math.floor(r() * 3)];
+  for (let y = 0; y < sy; y++)
+    for (let x = 0; x < sx; x++)
+      for (let z = 0; z < sz; z++) {
+        const nx = (x - sx / 2 + 0.5) / (sx / 2), ny = y / sy, nz = (z - sz / 2 + 0.5) / (sz / 2);
+        const bump = Math.sin(x * 1.3 + seed) * 0.08 + Math.cos(z * 1.7 + seed * 2) * 0.08;
+        if (nx * nx + nz * nz + ny * ny * 1.1 > 1 + bump) continue;
+        const layer = Math.floor(y / 2) % 3;
+        g.set(x, y, z, shadeHex(base, (layer === 0 ? 0.9 : layer === 1 ? 1 : 1.07) * (0.95 + r() * 0.08)));
+      }
+  return finish(g, 0.1, 3);
+}
+
+export function buildDeadTree(seed: number): PropModel {
+  const r = rng(seed * 13 + 1);
+  const h = 22 + Math.floor(r() * 10);
+  const g = new VoxelGrid(15, h + 2, 15);
+  const col = 0x6a5440;
+  g.box(7, 0, 7, 7, h, 7, col);
+  g.box(6, 0, 6, 8, 3, 8, col);
+  for (let b = 0; b < 4; b++) {
+    const y = 8 + b * Math.floor((h - 8) / 4);
+    const dx = b % 2 ? 1 : -1, dz = b % 3 ? 1 : -1;
+    for (let k = 1; k < 6; k++) g.set(7 + dx * k, y + k, 7 + (b > 1 ? dz * k : 0), col);
+  }
+  const pm = finish(g, 0.12);
+  pm.half.set(0.12, h * 0.12, 0.12);
+  return pm;
+}
+
+/** Freight car standing on the rails (long axis X). */
+export function buildBoxcar(seed: number): PropModel {
+  const r = rng(seed);
+  const L = 64, Wd = 26, Hh = 28;
+  const g = new VoxelGrid(L, Hh + 2, Wd);
+  const body = [0x8a3a2a, 0x6a5a3a, 0x5a6a7a][Math.floor(r() * 3)];
+  // wheels and frame
+  for (const wx of [8, 14, 50, 56]) for (const z of [2, Wd - 3]) g.box(wx - 2, 0, z, wx + 2, 4, z, PAL.metalDark);
+  g.box(2, 5, 3, L - 3, 6, Wd - 4, PAL.metalDark);
+  // body with vertical planks
+  g.box(2, 7, 2, L - 3, Hh, Wd - 3, (x) => shadeHex(body, x % 3 === 0 ? 0.82 : 1));
+  g.box(3, Hh + 1, 3, L - 4, Hh + 1, Wd - 4, shadeHex(body, 0.6));
+  // sliding door
+  g.box(26, 8, Wd - 3, 37, Hh - 2, Wd - 3, shadeHex(body, 0.7));
+  g.box(26, 8, 2, 37, Hh - 2, 2, shadeHex(body, 0.7));
+  return finish(g, 0.1, 3);
+}
+
+/** Straight railway track along X (decor only): sleepers + two rails. */
+export function buildTrack(lengthM: number): PropModel {
+  const L = Math.round(lengthM / 0.1);
+  const g = new VoxelGrid(L, 2, 26);
+  for (let x = 0; x < L; x += 6) g.box(x, 0, 1, x + 2, 0, 24, 0x5a4030);
+  g.box(0, 1, 6, L - 1, 1, 6, 0x7a7a80);
+  g.box(0, 1, 19, L - 1, 1, 19, 0x7a7a80);
+  return finish(g, 0.1, 4);
+}

@@ -9,6 +9,7 @@ import { PAL } from '../gfx/palette';
 import { audio } from '../audio';
 import { Mission, MissionResult, missionWaves, SquadMember } from './mission';
 import { buildInterior, ShopKind } from './interiors';
+import { MapKind, MAP_NAMES } from './map';
 import { TB } from './tbalance';
 import {
   AMMO_NAME,
@@ -399,8 +400,11 @@ export class TacticsApp {
     this.clear();
     this.mode = 'mission';
     const before = new Set(c.roster.filter((m) => m.wounded > 0).map((m) => m.id));
+    const kinds: MapKind[] = ['plaza', 'plaza', 'desert', 'rail'];
+    const mapKind: MapKind = c.mission < kinds.length ? kinds[c.mission] : (['plaza', 'desert', 'rail'] as MapKind[])[c.mission % 3];
     this.mission = new Mission(this.view, this.ui, {
-      name: `Misia ${n}: Námestie`,
+      name: `Misia ${n}: ${MAP_NAMES[mapKind]}`,
+      mapKind,
       seed: 1000 + c.mission * 17 + Math.floor(Math.random() * 1000),
       squads,
       sheriff: { weapon: c.sheriff.weapon, hp: TB.sheriffHp + c.sheriff.hp, reserve: sheriffAmmo, acc: c.sheriff.acc, reload: c.sheriff.reload },
@@ -450,7 +454,7 @@ export class TacticsApp {
     saveCampaign(c);
     const list = (a: string[]) => (a.length ? a.join(', ') : '–');
     this.lastResult = `<h1>${r.won ? 'VÝHRA!' : 'ÚSTUP'}</h1>
-      <p>${r.won ? 'Námestie je čisté.' : 'Šerif padol – muži ho odniesli z boja.'} Zneškodnených: <b>${r.kills}</b></p>
+      <p>${r.won ? 'Banda je rozprášená.' : 'Šerif padol – muži ho odniesli z boja.'} Zneškodnených: <b>${r.kills}</b></p>
       <p class="coinline">+${reward} $</p>
       <p>Padli: <b>${list(fallenNames)}</b> · Zranení (doktor): <b>${list(woundedNames)}</b></p>`;
     this.mission?.dispose();

@@ -91,3 +91,9 @@ viac pokusov a nákupy v obchode. Generované levely 11+ sú pre priemerného hr
 - **Munícia na misiu**: každý si zo skladu vezme až 24 nábojov (puška 20, broky 12), šerif 36. Čo neminú, vrátia do skladu. Bez munície muž nestrieľa.
 - **Odmena**: výhra 50 $ + 5 $ za banditu + 10 $ × číslo misie, ústup 3 $ za banditu. Šerif po prehre neumiera natrvalo (muži ho odnesú), misia sa opakuje.
 - **„Dead Eye“ v pôvodnej hre premenované na „Sústredenie“** (právne riziko názvu z inej hry).
+
+## Krok 4 – lokality
+- **Pustatina**: bez domov, skaly (malé = nízky kryt, veľké = zakrývajú výhľad), prevrátený voz, kaktusy a suché stromy okolo.
+- **Železnica**: koľaje naprieč mapou s nákladnými vagónmi (vysoký nezničiteľný kryt, medzi nimi priechody), vodná veža, stanica a domy na našej strane, banda prichádza z prérie za vlakom.
+- Poradie: misie 1–2 Námestie, 3 Pustatina, 4 Železnica, ďalej sa striedajú; každá misia má nový náhodný seed. Náročnosť rastie s číslom misie (viac vĺn, väčšie vlny, viac pušiek, vyššie HP).
+- **Vyváženie taktického režimu ešte nie je doladené** – zatiaľ len odhad. Testovacie behy bez zásahu hráča (šerif nestrieľa) končili raz výhrou, raz prehrou, takže s aktívnym šerifom by misia 1 mala byť zvládnuteľná. Čakám na spätnú väzbu z hrania na telefóne.

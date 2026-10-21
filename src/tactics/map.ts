@@ -18,6 +18,10 @@ import {
   buildWantedBoard,
   buildWaterTower,
   buildWell,
+  buildRock,
+  buildDeadTree,
+  buildBoxcar,
+  buildTrack,
   PropModel,
 } from '../gfx/props';
 import { PAL } from '../gfx/palette';
@@ -28,7 +32,8 @@ import { PAL } from '../gfx/palette';
 // World axes: x = east, z = south (player comes from +z, bandits from -z).
 // ---------------------------------------------------------------------------
 
-export type CoverKind = 'barrel' | 'crate' | 'stack' | 'wagon' | 'hay' | 'trough' | 'sandbags' | 'fence' | 'well' | 'tower' | 'tnt';
+export type CoverKind = 'barrel' | 'crate' | 'stack' | 'wagon' | 'hay' | 'trough' | 'sandbags' | 'fence' | 'well' | 'tower' | 'tnt' | 'rock' | 'rockBig' | 'boxcar';
+export type MapKind = 'plaza' | 'desert' | 'rail';
 
 /** Height (m) a cover protects up to. ≥ 1.6 = full cover even when standing. */
 const COVER_HEIGHT: Record<CoverKind, number> = {
@@ -43,8 +48,11 @@ const COVER_HEIGHT: Record<CoverKind, number> = {
   well: 2.6,
   tower: 0,
   tnt: 0.9,
+  rock: 0.9,
+  rockBig: 2.0,
+  boxcar: 2.6,
 };
-const COVER_HP: Record<CoverKind, number> = { barrel: 14, crate: 16, stack: 40, wagon: 45, hay: 20, trough: 25, sandbags: 60, fence: 18, well: 999, tower: 999, tnt: 1 };
+const COVER_HP: Record<CoverKind, number> = { barrel: 14, crate: 16, stack: 40, wagon: 45, hay: 20, trough: 25, sandbags: 60, fence: 18, well: 999, tower: 999, tnt: 1, rock: 999, rockBig: 999, boxcar: 999 };
 
 export class CoverObj {
   alive = true;
@@ -291,6 +299,11 @@ function prop(kind: string, seed = 1): PropModel {
       wanted: () => buildWantedBoard(),
       hitch: () => buildHitchingPost(),
       cactus: () => buildCactus(seed),
+      rock: () => buildRock(seed, false),
+      rockBig: () => buildRock(seed, true),
+      boxcar: () => buildBoxcar(seed),
+      tree: () => buildDeadTree(seed),
+      track: () => buildTrack(60),
     };
     m = builders[kind]();
     propCache.set(key, m);
@@ -298,14 +311,13 @@ function prop(kind: string, seed = 1): PropModel {
   return m;
 }
 
-function groundTexture(w: number, h: number, seed: number): THREE.CanvasTexture {
+function groundTexture(w: number, h: number, seed: number, base = [0xc9, 0x96, 0x5e], tracks = true): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const ctx = c.getContext('2d')!;
   const r = rng(seed);
   const img = ctx.createImageData(w, h);
-  const base = [0xc9, 0x96, 0x5e];
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       let f = 0.95 + r() * 0.07;
@@ -321,7 +333,7 @@ function groundTexture(w: number, h: number, seed: number): THREE.CanvasTexture 
     }
   ctx.putImageData(img, 0, 0);
   // wagon tracks crossing the plaza
-  ctx.strokeStyle = 'rgba(120,80,40,0.18)';
+  ctx.strokeStyle = tracks ? 'rgba(120,80,40,0.18)' : 'rgba(0,0,0,0)';
   ctx.lineWidth = 2;
   for (const off of [-10, 10, -30, 30]) {
     ctx.beginPath();
@@ -339,17 +351,24 @@ function groundTexture(w: number, h: number, seed: number): THREE.CanvasTexture 
  * Plaza mission map. `X`/`Z` = half size of the open area.
  */
 export function generatePlaza(seed: number, scene: THREE.Object3D, X = 12, Z = 14): MapData {
+  return generateMap('plaza', seed, scene, X, Z);
+}
+
+export const MAP_NAMES: Record<MapKind, string> = { plaza: 'Námestie', desert: 'Pustatina', rail: 'Železnica' };
+export const MAP_GOALS: Record<MapKind, string> = { plaza: 'Vyčisti námestie od bandy', desert: 'Prepadnutie v pustatine – ubráň sa', rail: 'Zachráň stanicu pred bandou' };
+
+export function generateMap(kind: MapKind, seed: number, scene: THREE.Object3D, X = 12, Z = 14): MapData {
   const r = rng(seed);
   const group = new THREE.Group();
   scene.add(group);
   const bounds: Bounds = { minX: -X, maxX: X, minZ: -Z, maxZ: Z };
 
   // ground
-  const gtex = groundTexture(256, 288, seed);
+  const gtex = groundTexture(256, 288, seed, kind === 'desert' ? [0xd8, 0xb0, 0x7a] : [0xc9, 0x96, 0x5e], kind === 'plaza');
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(X * 2, Z * 2), new THREE.MeshBasicMaterial({ map: gtex }));
   ground.rotation.x = -Math.PI / 2;
   group.add(ground);
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), new THREE.MeshBasicMaterial({ color: PAL.dirt }));
+  const outer = new THREE.Mesh(new THREE.PlaneGeometry(260, 260), new THREE.MeshBasicMaterial({ color: kind === 'desert' ? 0xd2aa74 : PAL.dirt }));
   outer.rotation.x = -Math.PI / 2;
   outer.position.y = -0.02;
   group.add(outer);
@@ -391,19 +410,35 @@ export function generatePlaza(seed: number, scene: THREE.Object3D, X = 12, Z = 1
       p += v.widthM + (r() < 0.3 ? 1 + r() * 1.5 : 0);
     }
   };
-  side('x', -Z, 0, -X - 8, X + 8, [-3.5, 3.5]); // north, facing south; bandit street gap
-  side('x', Z, Math.PI, -X - 8, X + 8, [-3.5, 3.5]); // south, facing north; our entry
-  side('z', -X, Math.PI / 2, -Z + 1, Z - 1, r() < 0.6 ? [-2.5 + (r() - 0.5) * 8, 2.5 + (r() - 0.5) * 8] : null); // west
-  side('z', X, -Math.PI / 2, -Z + 1, Z - 1, r() < 0.6 ? [-2.5, 2.5] : null); // east
-
-  // decor that doesn't block (lamps, boards, hitching posts, cacti in the side streets)
-  for (let k = 0; k < 8; k++) {
-    const sx = (r() < 0.5 ? -1 : 1) * (X - 0.6);
-    const sz = (r() - 0.5) * (Z * 1.6);
-    addStatic(prop(r() < 0.5 ? 'lamp' : 'hitch').geo, sx, sz, Math.PI / 2);
+  if (kind === 'plaza') {
+    side('x', -Z, 0, -X - 8, X + 8, [-3.5, 3.5]); // north, facing south; bandit street gap
+    side('x', Z, Math.PI, -X - 8, X + 8, [-3.5, 3.5]); // south, facing north; our entry
+    side('z', -X, Math.PI / 2, -Z + 1, Z - 1, r() < 0.6 ? [-2.5 + (r() - 0.5) * 8, 2.5 + (r() - 0.5) * 8] : null); // west
+    side('z', X, -Math.PI / 2, -Z + 1, Z - 1, r() < 0.6 ? [-2.5, 2.5] : null); // east
+    // decor that doesn't block (lamps, boards, hitching posts, cacti in the side streets)
+    for (let k = 0; k < 8; k++) {
+      const sx = (r() < 0.5 ? -1 : 1) * (X - 0.6);
+      const sz = (r() - 0.5) * (Z * 1.6);
+      addStatic(prop(r() < 0.5 ? 'lamp' : 'hitch').geo, sx, sz, Math.PI / 2);
+    }
+    addStatic(prop('wanted').geo, -4.6, Z - 0.8, Math.PI);
+    for (let k = 0; k < 6; k++) addStatic(prop('cactus', k + 1).geo, (r() - 0.5) * 8, -Z - 6 - r() * 10, r() * 6);
+  } else if (kind === 'desert') {
+    // open land: cacti, dead trees and rocks around (decor), a few inside (no cover)
+    for (let k = 0; k < 40; k++) {
+      const a = r() * Math.PI * 2;
+      const d = 15 + r() * 25;
+      const px = Math.cos(a) * d * 1.1, pz = Math.sin(a) * d;
+      const t = r();
+      addStatic(prop(t < 0.45 ? 'cactus' : t < 0.7 ? 'tree' : 'rockBig', 1 + (k % 5)).geo, px, pz, r() * 6);
+    }
+    for (let k = 0; k < 5; k++) addStatic(prop('cactus', 10 + k).geo, (r() - 0.5) * X * 1.8, (r() - 0.5) * Z * 1.8, r() * 6);
+  } else {
+    // railway: station + buildings in the south, tracks across, open prairie north
+    side('x', Z, Math.PI, -X - 8, X + 8, [-3.5, 3.5]);
+    addStatic(prop('track').geo, 0, -3, 0);
+    for (let k = 0; k < 12; k++) addStatic(prop(r() < 0.5 ? 'cactus' : 'tree', 1 + (k % 5)).geo, (r() - 0.5) * 50, -Z - 3 - r() * 16, r() * 6);
   }
-  addStatic(prop('wanted').geo, -4.6, Z - 0.8, Math.PI);
-  for (let k = 0; k < 6; k++) addStatic(prop('cactus', k + 1).geo, (r() - 0.5) * 8, -Z - 6 - r() * 10, r() * 6);
 
   const merged = mergeGeometries(statics, false);
   for (const s of statics) s.dispose();
@@ -430,20 +465,48 @@ export function generatePlaza(seed: number, scene: THREE.Object3D, X = 12, Z = 1
     return c;
   };
 
-  // landmark in the middle
-  if (r() < 0.5) place('well', (r() - 0.5) * 3, (r() - 0.5) * 3, false);
-  else place('tower', (r() < 0.5 ? -1 : 1) * (X - 5), -Z * 0.2, false);
+  // landmark
+  if (kind === 'plaza') {
+    if (r() < 0.5) place('well', (r() - 0.5) * 3, (r() - 0.5) * 3, false);
+    else place('tower', (r() < 0.5 ? -1 : 1) * (X - 5), -Z * 0.2, false);
+  } else if (kind === 'rail') {
+    // freight cars on the track with gaps to run through
+    let x = -X - 2 + r() * 3;
+    while (x < X) {
+      place('boxcar', x + 3.2, -3, false, 1 + Math.floor(r() * 3));
+      x += 6.4 + 3 + r() * 3;
+    }
+    place('tower', X - 1.5, -Z + 2.5, false);
+  } else {
+    place('wagon', (r() - 0.5) * 4, (r() - 0.5) * 4, r() < 0.5);
+  }
 
-  const weights: [CoverKind, number][] = [
+  const weights: [CoverKind, number][] = kind === 'desert'
+    ? [
+        ['rock', 4],
+        ['rockBig', 2],
+        ['wagon', 0.6],
+        ['hay', 0.6],
+        ['barrel', 0.6],
+      ]
+    : kind === 'rail'
+      ? [
+          ['crate', 2],
+          ['stack', 2.5],
+          ['barrel', 2],
+          ['sandbags', 1],
+          ['hay', 0.6],
+        ]
+      : [
     ['barrel', 3],
     ['crate', 2],
     ['stack', 2],
     ['wagon', 1.5],
     ['hay', 1.5],
     ['trough', 1.2],
-    ['sandbags', 1],
-    ['fence', 1],
-  ];
+          ['sandbags', 1],
+          ['fence', 1],
+        ];
   const total = weights.reduce((a, [, w]) => a + w, 0);
   const pickKind = (): CoverKind => {
     let q = r() * total;

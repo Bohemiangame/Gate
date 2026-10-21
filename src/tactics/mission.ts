@@ -6,7 +6,7 @@ import { buildBackdrop } from '../gfx/town';
 import type { WeaponKind } from '../gfx/characterModels';
 import { audio, vibrate } from '../audio';
 import { raycast, Hittable, HitPart } from '../game/hit';
-import { CoverObj, CoverSlot, generatePlaza, MapData } from './map';
+import { CoverObj, CoverSlot, generateMap, MapData, MapKind, MAP_GOALS } from './map';
 import { TB } from './tbalance';
 import { GroupId, Unit } from './units';
 import { TacticsHud, CardInfo } from './thud';
@@ -34,6 +34,7 @@ export interface MissionResult {
 export interface MissionDef {
   name: string;
   seed: number;
+  mapKind?: MapKind;
   squads: SquadMember[];
   sheriff: { weapon: WeaponKind; hp: number; reserve: number; acc: number; reload: number };
   waves: { at: number; n: number; weapons?: WeaponKind[] }[];
@@ -153,7 +154,7 @@ export class Mission {
     backdrop.position.set(0, 0, 10);
     this.backdrop = backdrop;
     this.scene.add(backdrop, this.root, this.particles.mesh, this.tracers.group, this.flashes.group);
-    this.map = generatePlaza(def.seed, this.root);
+    this.map = generateMap(def.mapKind ?? 'plaza', def.seed, this.root);
     this.hud = new TacticsHud(ui);
 
     // markers
@@ -193,7 +194,7 @@ export class Mission {
       audio.play('click');
     };
     this.bindInput(view.renderer.domElement);
-    this.hud.showBanner(`${def.name.toUpperCase()}<br><small>Vyčisti námestie od bandy</small>`, '', 2.4);
+    this.hud.showBanner(`${def.name.toUpperCase()}<br><small>${MAP_GOALS[def.mapKind ?? 'plaza']}</small>`, '', 2.4);
   }
 
   private addUnit(side: 'player' | 'enemy', g: GroupId, w: WeaponKind, variant: number, pos: THREE.Vector3, hp: number, reserve: number): Unit {
@@ -932,7 +933,7 @@ export class Mission {
   private win(): void {
     this.phase = 'won';
     audio.play('win');
-    this.hud.showBanner('NÁMESTIE JE NAŠE!', '', 2.5);
+    this.hud.showBanner('VYHRALI SME!', '', 2.5);
     setTimeout(() => !this.disposed && this.result(true), 2200);
   }
 

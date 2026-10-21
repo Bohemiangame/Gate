@@ -23,7 +23,7 @@ function startApp(view: View, ui: HTMLElement): void {
 }
 
 function startMission(view: View, ui: HTMLElement, params: URLSearchParams): void {
-  const def = { ...DEFAULT_MISSION, seed: parseInt(params.get('seed') ?? String(DEFAULT_MISSION.seed), 10) };
+  const def = { ...DEFAULT_MISSION, seed: parseInt(params.get('seed') ?? String(DEFAULT_MISSION.seed), 10), mapKind: (params.get('map') ?? 'plaza') as 'plaza' | 'desert' | 'rail' };
   const m = new Mission(view, ui, def);
   (window as unknown as { mission: Mission }).mission = m;
   let last = performance.now();

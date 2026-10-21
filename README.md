@@ -26,6 +26,14 @@ rozhodnutia: [`DECISIONS.md`](DECISIONS.md).
 - `?debug` – FPS, počet trojuholníkov, skoky na level, `bot` (autopilot), `god`, +500 $.
 - `?sim` – simulácia vyváženia: bot prejde levely bez grafiky a vypíše tabuľku (`?sim&levels=12&runs=3&profile=good,average,bad`).
 - `?showcase` – pôvodná vizuálna ukážka, `?view=lineup` – postavy zblízka.
+## Verzia 2: taktická hra (prototyp) – `?tactics`
+**https://bohemiangame.github.io/Gate/?tactics** – hrá sa **na šírku**.
+- **Mesto**: ulica s obchodmi (ZBROJNICA, OBCHOD, SALOON, DOKTOR, ŠERIF). Ťukni na budovu → interiér s predavačom, nakupuje sa v tabuľke vpravo. **NA MISIU ▶** spustí ďalšiu misiu.
+- **Misia**: vľavo karty Šerif / Skupina A / Skupina B. Ťukni na kartu (čas sa spomalí) a potom na miesto na mape → muži sa rozdelia do krytov. Vpravo hore PAĽBA / KRYT pre vybranú skupinu. **Vpravo dole mieriaca plocha šerifa**: drž palec a ťahaj = zameriavač sa hýbe a šerif strieľa, pusť = kryje sa a nabíja. Keď mieriš na toho istého banditu 0,7 s, zameriavač zožltne = rana na hlavu. Ťahanie po mape posúva kameru.
+- Lokality: Námestie (misie 1–2), Pustatina (3), Železnica (4), potom sa striedajú.
+- Rýchly test bez mesta: `?tactics&quick&map=plaza|desert|rail`. Vizuálny test: `?tactics&test&pix=2|3`.
+- Čísla: `src/tactics/tbalance.ts` (boj), `src/tactics/campaign.ts` (ceny, štart). Rozhodnutia v `DECISIONS.md`.
+
 ## Spustenie lokálne
 ```bash
 npm install
