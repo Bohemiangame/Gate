@@ -391,6 +391,7 @@ function dieBurst(ctx: Ctx, c: Character, force = 3.5): void {
   tmp.copy(c.root.position).add(new THREE.Vector3(0, 0.6 * c.root.scale.y, -0.5));
   ctx.particles.burst(c.model.debris, c.root.matrixWorld, tmp, force, 0.065 * c.root.scale.x, 220);
   ctx.scene.remove(c.root);
+  c.dispose();
   audio.play('die', 0.02);
 }
 
@@ -493,6 +494,7 @@ export class Rider implements Hittable {
 
   remove(): void {
     this.ctx.scene.remove(this.c.root, this.warn.sprite);
+    this.c.dispose();
     this.warn.dispose();
   }
 }
@@ -664,6 +666,7 @@ export class Bandit implements Hittable {
 
   remove(): void {
     this.ctx.scene.remove(this.c.root, this.warn.sprite);
+    this.c.dispose();
     if (this.hpLabel) this.ctx.scene.remove(this.hpLabel.sprite);
     this.warn.dispose();
   }

@@ -1,11 +1,22 @@
 import * as THREE from 'three';
-import { voxelMaterial, flashMaterial } from '../engine/voxel';
 import { CharacterModel, GunModel, VS, WeaponKind } from './characterModels';
 
 export type Pose = 'idle' | 'run' | 'aim' | 'crouch' | 'reload' | 'cheer' | 'throw';
 
-const shadowGeo = new THREE.CircleGeometry(0.32, 12).rotateX(-Math.PI / 2);
-const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false });
+export const shadowGeo = new THREE.CircleGeometry(0.32, 12).rotateX(-Math.PI / 2);
+
+/**
+ * A body part: only a transform + the geometry to draw. Parts are not drawn one by one;
+ * `CharacterBatcher` draws all parts sharing a geometry with one InstancedMesh.
+ */
+export class Part extends THREE.Object3D {
+  constructor(public geometry: THREE.BufferGeometry) {
+    super();
+  }
+}
+
+/** Every live character (for the batcher). */
+export const characters = new Set<Character>();
 
 interface Joints {
   bodyY: number;
@@ -30,18 +41,18 @@ const ZERO: Joints = { bodyY: 0, lean: 0, head: 0, armLx: 0, armLz: 0, armRx: 0,
 export class Character {
   readonly root = new THREE.Group();
   readonly body = new THREE.Group();
-  readonly torso: THREE.Mesh;
-  readonly head: THREE.Mesh;
-  readonly armL: THREE.Mesh;
-  readonly armR: THREE.Mesh;
-  readonly thighL: THREE.Mesh;
-  readonly thighR: THREE.Mesh;
-  readonly shinL: THREE.Mesh;
-  readonly shinR: THREE.Mesh;
-  gun: THREE.Mesh;
+  readonly torso: Part;
+  readonly head: Part;
+  readonly armL: Part;
+  readonly armR: Part;
+  readonly thighL: Part;
+  readonly thighR: Part;
+  readonly shinL: Part;
+  readonly shinR: Part;
+  gun: Part;
   readonly muzzle = new THREE.Object3D();
-  readonly shadow: THREE.Mesh;
-  readonly meshes: THREE.Mesh[];
+  readonly shadow: Part;
+  readonly parts: Part[];
 
   pose: Pose = 'idle';
   /** Elevation of the aim in radians (positive = up). */
@@ -50,7 +61,7 @@ export class Character {
   private phase = Math.random() * 10;
   private j: Joints = { ...ZERO };
   private recoil = 0;
-  private flashT = 0;
+  flashT = 0;
   private t = Math.random() * 10;
 
   constructor(
@@ -58,7 +69,7 @@ export class Character {
     gun: GunModel,
     public weapon: WeaponKind,
   ) {
-    const m = (g: THREE.BufferGeometry) => new THREE.Mesh(g, voxelMaterial);
+    const m = (g: THREE.BufferGeometry) => new Part(g);
     this.torso = m(model.torso);
     this.head = m(model.head);
     this.armL = m(model.armL);
@@ -90,12 +101,17 @@ export class Character {
     this.gun.add(this.muzzle);
     this.muzzle.position.copy(gun.muzzle);
 
-    this.shadow = new THREE.Mesh(shadowGeo, shadowMat);
+    this.shadow = new Part(shadowGeo);
     this.shadow.position.y = 0.02;
-    this.shadow.renderOrder = -1;
     this.root.add(this.shadow);
 
-    this.meshes = [this.torso, this.head, this.armL, this.armR, this.thighL, this.thighR, this.shinL, this.shinR, this.gun];
+    this.parts = [this.torso, this.head, this.armL, this.armR, this.thighL, this.thighR, this.shinL, this.shinR, this.gun];
+    characters.add(this);
+  }
+
+  /** Stop drawing this character for good (dead / level unloaded). */
+  dispose(): void {
+    characters.delete(this);
   }
 
   setGun(kind: WeaponKind, gun: GunModel): void {
@@ -110,7 +126,6 @@ export class Character {
 
   flash(): void {
     this.flashT = 0.07;
-    for (const mesh of this.meshes) mesh.material = flashMaterial;
   }
 
   getMuzzleWorld(out: THREE.Vector3): THREE.Vector3 {
@@ -125,10 +140,7 @@ export class Character {
 
   update(dt: number): void {
     this.t += dt;
-    if (this.flashT > 0) {
-      this.flashT -= dt;
-      if (this.flashT <= 0) for (const mesh of this.meshes) mesh.material = voxelMaterial;
-    }
+    if (this.flashT > 0) this.flashT -= dt;
     this.recoil = Math.max(0, this.recoil - dt * 3.5);
 
     const tgt: Joints = { ...ZERO };

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { VoxelGrid, meshGrid, rng, shadeHex, voxelMaterial } from '../engine/voxel';
 import { rasterText, textWidth } from '../engine/font';
 import { PAL, pick } from './palette';
@@ -303,13 +304,21 @@ export function buildStreet(zStart: number, zEnd: number, seed: number): THREE.G
   group.add(ground);
 
   const d = decor();
-  const place = (pm: PropModel, x: number, z: number, rotY = 0) => {
-    const m = new THREE.Mesh(pm.geo, voxelMaterial);
-    m.position.set(x, 0, z);
-    m.rotation.y = rotY;
-    group.add(m);
-    return m;
+  // Static scenery is merged into 40 m chunks → a handful of draw calls instead of one per object.
+  const CHUNK = 40;
+  const chunks = new Map<number, THREE.BufferGeometry[]>();
+  const tmpObj = new THREE.Object3D();
+  const addStatic = (geo: THREE.BufferGeometry, x: number, z: number, rotY: number) => {
+    tmpObj.position.set(x, 0, z);
+    tmpObj.rotation.set(0, rotY, 0);
+    tmpObj.updateMatrix();
+    const g = geo.clone().applyMatrix4(tmpObj.matrix);
+    const k = Math.floor(z / CHUNK);
+    let list = chunks.get(k);
+    if (!list) chunks.set(k, (list = []));
+    list.push(g);
   };
+  const place = (pm: PropModel, x: number, z: number, rotY = 0) => addStatic(pm.geo, x, z, rotY);
 
   for (const side of [-1, 1]) {
     let z = zStart;
@@ -319,11 +328,8 @@ export function buildStreet(zStart: number, zEnd: number, seed: number): THREE.G
       if (idx === last) idx = (idx + 1) % vars.length;
       last = idx;
       const v = vars[idx];
-      const m = new THREE.Mesh(v.geo, voxelMaterial);
       const cz = z - v.widthM / 2;
-      m.position.set(side * STREET_HALF, 0, cz);
-      m.rotation.y = side < 0 ? Math.PI / 2 : -Math.PI / 2;
-      group.add(m);
+      addStatic(v.geo, side * STREET_HALF, cz, side < 0 ? Math.PI / 2 : -Math.PI / 2);
       z -= v.widthM;
       // alley gap with a cactus or crates
       const gap = 0.6 + r() * 2.2;
@@ -351,6 +357,13 @@ export function buildStreet(zStart: number, zEnd: number, seed: number): THREE.G
     }
   }
 
+  for (const list of chunks.values()) {
+    const merged = mergeGeometries(list, false);
+    for (const g of list) g.dispose();
+    if (!merged) continue;
+    merged.computeBoundingSphere();
+    group.add(new THREE.Mesh(merged, voxelMaterial));
+  }
   return group;
 }
 

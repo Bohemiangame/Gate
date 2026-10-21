@@ -50,3 +50,11 @@ Bot medzi levelmi nakupuje v obchode najlacnejšie vylepšenie. Cieľ: prvé 3 l
 Priemerný hráč: 4.–10. level vyhráva s 9–15 preživšími, 85–118 s. Slabý hráč: od 7.–12. levelu potrebuje
 viac pokusov a nákupy v obchode. Generované levely 11+ sú pre priemerného hráča zatiaľ skôr ľahšie.
 **Známe:** neskoré levely sú o niečo dlhšie (90–120 s) ako cieľ 60–90 s – skrátenie by išlo menším počtom banditov alebo kratšími úsekmi.
+
+## Výkon
+- **Instancing postáv** (`src/gfx/batcher.ts`): časti postáv sú len transformácie; všetky rovnaké časti (napr. všetky trupy jednej varianty) sa kreslia jedným `InstancedMesh`. Zásahový „záblesk“ = farba inštancie ×5.
+- **Statická scenéria** (domy, sudy, kaktusy) sa pri štarte levelu zlúči do blokov po 40 m.
+- Dohľad kamery 100 m, hmla 38–95 m, interiéry domov vyplnené (žiadne skryté steny).
+- Výsledok v najhoršom prípade (20 členov, prestrelka, 10. level): **~160 draw calls, ~150–190 tis. trojuholníkov**, herná logika ~0,5 ms/snímku (pôvodne 384 volaní a 390 tis. trojuholníkov).
+- Na počítači (na šírku) je kamera v prestrelke tesnejšia – primárny cieľ je telefón na výšku.
+- **Service worker nie je** – pri častých nasadeniach by mohol držať starú verziu v cache. Manifest stačí na „Pridať na plochu“ a spustenie na celú obrazovku.

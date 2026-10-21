@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { View } from '../engine/view';
 import { Character } from '../gfx/character';
+import { CharacterBatcher } from '../gfx/batcher';
 import { makeCharacter, gunModel } from '../gfx/models';
 import { buildBackdrop, buildStreet } from '../gfx/town';
 import { Flashes, Particles, Tracers } from '../gfx/effects';
@@ -47,6 +48,7 @@ export class Game {
   readonly particles = new Particles();
   readonly tracers = new Tracers(90);
   readonly flashes = new Flashes(60);
+  private batcher: CharacterBatcher;
   save: SaveData;
 
   // level state
@@ -120,6 +122,7 @@ export class Game {
     uiRoot: HTMLElement,
   ) {
     this.scene = view.scene;
+    this.batcher = new CharacterBatcher(view.scene);
     this.hud = new Hud(uiRoot);
     this.save = loadSave();
     audio.enabled = this.save.sound;
@@ -261,6 +264,7 @@ export class Game {
       f.playerCover.remove();
     }
     for (const d of this.dynamites) d.remove();
+    for (const m of this.members) m.c.dispose();
     this.scene.remove(this.root);
     this.root = new THREE.Group();
     this.scene.add(this.root);
@@ -298,6 +302,7 @@ export class Game {
     tmp.copy(victim.c.root.position).add(new THREE.Vector3(0, 0.6, 0.6));
     this.particles.burst(victim.c.model.debris, victim.c.root.matrixWorld, tmp, 3, 0.065, 200);
     this.root.remove(victim.c.root);
+    victim.c.dispose();
     this.hud.hurt();
     audio.play('hurt', 0.05);
     vibrate(60);
@@ -481,6 +486,7 @@ export class Game {
     this.flashes.update(dt);
     this.updateCamera(rawDt);
     this.updateHud(rawDt);
+    this.batcher.sync();
   }
 
   private moveMembers(dt: number, cx: number, cz: number, rate = 10): void {
@@ -669,6 +675,7 @@ export class Game {
       } else {
         r.alive = false;
         this.root.remove(r.c.root);
+        r.c.dispose();
       }
     }
 

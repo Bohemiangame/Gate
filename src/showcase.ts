@@ -7,6 +7,7 @@ import { Character } from './gfx/character';
 import { buildBarrel, buildBarricade, buildTntCrate, buildWagon } from './gfx/props';
 import { Flashes, Particles, Tracers } from './gfx/effects';
 import { Label } from './gfx/label';
+import { CharacterBatcher } from './gfx/batcher';
 import type { WeaponKind } from './gfx/characterModels';
 
 /**
@@ -16,6 +17,12 @@ import type { WeaponKind } from './gfx/characterModels';
  */
 export function startShowcase(view: View, params: URLSearchParams): void {
   const scene = view.scene;
+  const batcher = new CharacterBatcher(scene);
+  const origRender = view.render.bind(view);
+  view.render = () => {
+    batcher.sync();
+    origRender();
+  };
   const particles = new Particles();
   const tracers = new Tracers();
   const flashes = new Flashes();
