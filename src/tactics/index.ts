@@ -4,9 +4,27 @@ import { CharacterBatcher } from '../gfx/batcher';
 import { makeCharacter } from '../gfx/models';
 import { buildBackdrop } from '../gfx/town';
 import { generatePlaza } from './map';
+import { DEFAULT_MISSION, Mission } from './mission';
+
+function startMission(view: View, ui: HTMLElement, params: URLSearchParams): void {
+  const def = { ...DEFAULT_MISSION, seed: parseInt(params.get('seed') ?? String(DEFAULT_MISSION.seed), 10) };
+  const m = new Mission(view, ui, def);
+  (window as unknown as { mission: Mission }).mission = m;
+  let last = performance.now();
+  const frame = () => {
+    const now = performance.now();
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    m.update(dt);
+    view.render();
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
 
 /** Tactics prototype entry (?tactics). Step 1: visual test only. */
 export function startTactics(view: View, ui: HTMLElement, params: URLSearchParams): void {
+  if (!params.has('test')) return startMission(view, ui, params);
   const scene = view.scene;
   view.vfov = parseFloat(params.get('fov') ?? '40');
   view.setPixelSize(parseFloat(params.get('pix') ?? '3'));

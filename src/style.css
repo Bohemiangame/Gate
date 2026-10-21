@@ -128,3 +128,44 @@ html, body {
 .debug button { font: 11px monospace; margin: 2px; padding: 2px 5px; }
 
 .weapon.infight { left: 82px; bottom: calc(env(safe-area-inset-bottom) + 22px); }
+
+/* ---------- Tactics HUD (landscape) ---------- */
+.tac { position: absolute; inset: 0; pointer-events: none; }
+.tac button { pointer-events: auto; font-family: inherit; }
+.t-cards { position: absolute; left: calc(env(safe-area-inset-left) + 8px); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; }
+.t-card {
+  width: 118px; text-align: left; padding: 5px 8px; border-radius: 10px; border: 3px solid #2a1408; display: block;
+  background: rgba(40,22,10,0.72); color: #fff3d8; position: relative; box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+}
+.t-card b { display: block; font-size: 13px; letter-spacing: 0.5px; }
+.t-card .dots { display: block; font-size: 13px; letter-spacing: 1px; height: 14px; line-height: 14px; }
+.t-card .dots em { display: block; height: 8px; margin-top: 3px; border-radius: 4px; background: linear-gradient(#8aff7a, #3aa82a); }
+.t-card small { display: block; font-size: 10px; opacity: 0.85; line-height: 12px; }
+.t-card .stance { position: absolute; right: 6px; bottom: 5px; font-style: normal; font-size: 9px; font-weight: 900; color: #ffd060; }
+.t-card.sheriff { border-color: #d8b040; }
+.t-card.sheriff b { color: #ffd860; }
+.t-card.a b { color: #8ab8ff; }
+.t-card.b b { color: #8affb8; }
+.t-card.sel { background: rgba(120,70,20,0.92); transform: translateX(6px); border-color: #fff; }
+.t-card.dead { opacity: 0.4; }
+.t-top { position: absolute; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top) + 6px); text-align: center; font-weight: 900; font-size: 14px; color: #fff3d8; text-shadow: 0 2px 0 #2a1408; background: rgba(40,22,10,0.55); padding: 4px 12px; border-radius: 10px; white-space: nowrap; }
+.t-orders { position: absolute; right: calc(env(safe-area-inset-right) + 10px); top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.t-btn { width: 92px; padding: 10px 0; font-size: 15px; font-weight: 900; color: #fff; border-radius: 10px; border: 3px solid #2a1408; background: rgba(60,40,20,0.78); text-shadow: 0 2px 0 #000; }
+.t-btn.fire.on { background: linear-gradient(#e8702a, #b8401a); }
+.t-btn.hold.on { background: linear-gradient(#5a8ac8, #2a5a98); }
+.t-aimpad {
+  position: absolute; right: calc(env(safe-area-inset-right) + 18px); bottom: calc(env(safe-area-inset-bottom) + 16px);
+  width: 132px; height: 132px; border-radius: 50%; border: 3px solid rgba(255,240,210,0.55); background: rgba(40,22,10,0.35);
+  pointer-events: auto; display: flex; align-items: center; justify-content: center; touch-action: none;
+}
+.t-aimpad span { position: absolute; bottom: -18px; font-size: 11px; font-weight: 900; color: #fff3d8; text-shadow: 0 1px 0 #000; }
+.t-aimpad .knob { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,230,180,0.5); border: 2px solid #fff; }
+.t-aimpad.active { border-color: #ff7a4a; background: rgba(120,30,10,0.35); }
+.t-aimpad.active .knob { background: rgba(255,120,60,0.8); }
+.t-sammo { position: absolute; right: calc(env(safe-area-inset-right) + 160px); bottom: calc(env(safe-area-inset-bottom) + 22px); font-weight: 900; font-size: 16px; color: #ffe8b0; text-shadow: 0 2px 0 #2a1408; }
+.t-sammo.urgent { color: #ff7a5a; }
+.t-banner { position: absolute; left: 0; right: 0; top: 34%; text-align: center; font-weight: 900; font-size: 30px; color: #ffe070; text-shadow: 0 3px 0 #5a2a08; }
+.t-banner.bad { color: #ff7a5a; }
+.t-rotate { position: absolute; inset: 0; background: #2a1a10; color: #fff3d8; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: 900; pointer-events: auto; z-index: 5; }
+.t-rotate div { font-size: 64px; }
+.t-rotate p { font-size: 20px; }

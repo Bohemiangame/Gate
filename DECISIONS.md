@@ -58,3 +58,23 @@ viac pokusov a nákupy v obchode. Generované levely 11+ sú pre priemerného hr
 - Výsledok v najhoršom prípade (20 členov, prestrelka, 10. level): **~160 draw calls, ~150–190 tis. trojuholníkov**, herná logika ~0,5 ms/snímku (pôvodne 384 volaní a 390 tis. trojuholníkov).
 - Na počítači (na šírku) je kamera v prestrelke tesnejšia – primárny cieľ je telefón na výšku.
 - **Service worker nie je** – pri častých nasadeniach by mohol držať starú verziu v cache. Manifest stačí na „Pridať na plochu“ a spustenie na celú obrazovku.
+
+---
+# Verzia 2: taktická hra (v `?tactics`, pôvodná hra ostáva na hlavnej adrese)
+
+## Krok 1 – vizuál
+- **Pixelizovaný 3D svet**: scéna sa vykresľuje v nižšom rozlíšení (1 pixel = 2 CSS px) a zväčšuje sa bez rozmazania, plus **tmavé obrysy** podľa hĺbky (post-efekt). Vyzerá to ako pixel art, ale postavy a kamera fungujú zo všetkých strán a animácie z kódu ostávajú. Hustota pixelov `TB.pixelSize` v `src/tactics/tbalance.ts` (2 = jemnejšie, 3 = hrubšie).
+- **Kamera na šírku**, uhol 42°, vzdialenosť 22 m – vidno celé námestie aj domy, takmer bez oblohy. Na výšku sa ukáže výzva „Otoč telefón“.
+- **Námestie** sa skladá náhodne (seed): domy 1–3 poschodia rôznej šírky, verandy s úzkymi doskami v 4 farebných štýloch, niektoré domy bez verandy, uprostred studňa alebo vodná veža, kryty (sudy, debny, kopy debien, vozy, seno, koryto, vrecia s pieskom, ploty), TNT na strane banditov.
+- **Šerif** má vlastný vzhľad (čierny klobúk a vesta, biela košeľa, zlatá hviezda), skupina A modrá, skupina B zelená, bandity červené šatky.
+
+## Krok 2 – misia „Námestie“
+- **Kryty majú „sloty“** (miesta za krytom). Slot chráni proti strelcovi na opačnej strane krytu. Nízke kryty sa dajú prestreľovať ponad, vysoké (kopy debien, studňa) blokujú výhľad.
+- **Rozkaz**: ťukni na kartu skupiny vľavo (čas sa spomalí na 30 %), potom na miesto na mape → skupina sa rozdelí do voľných krytov okolo, ktoré chránia proti bande. Ťuk na vlastného muža ho tiež vyberie. Ťahanie prstom po mape posúva kameru. Na PC klávesy 1/2/3.
+- **Režimy skupiny**: PAĽBA (strieľa sama, vykláňa sa, 2 rany, skryje sa) / KRYT (neodkrýva sa, šetrí náboje).
+- **Každý strelec má vlastný zásobník a zásobu nábojov**, nabíja sám, keď mu dôjde. Bandity tiež. Bez zásoby nestrieľa.
+- **Šerif**: mieriaca plocha vpravo dole funguje ako touchpad – ťahanie posúva zameriavač po mape, **kým držíš palec, šerif je vyklonený a strieľa**. Zameriavač sa prichytí na banditu; keď mieriš na toho istého 0,7 s, zameriavač zožltne = mierené na hlavu (2× poškodenie). Pustíš = skryje sa a nabíja po jednom náboji. Šerif má 36 nábojov v zásobe (nie nekonečno).
+- **Zásahy skupín a banditov** sa počítajú pravdepodobnosťou (presnosť zbrane × vzdialenosť × kryt: vyklonený za krytom 45 %, skrytý 7 %, v pohybe 65 %). Strela do krytu ho poškodzuje, kryty sa dajú rozstrieľať.
+- **Bandity** prichádzajú vo vlnách zo severu, vyberajú si kryty, ktoré ich chránia pred najbližším z nás, približne 11 m od nás, a pravidelne sa presúvajú. Pred výstrelom bliká „!“.
+- **Padnutý člen**: 60 % zranený (pôjde k doktorovi), 40 % padol natrvalo. Šerif padne = prehra.
+- Čísla: `src/tactics/tbalance.ts`. Vyváženie je zatiaľ len odhad, výsledok sa líši hru od hry (testovacie behy: raz výhra, raz prehra).
