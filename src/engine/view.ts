@@ -5,7 +5,7 @@ import { FOG_COLOR, makeSkyTexture } from '../gfx/town';
 export class View {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
-  readonly camera = new THREE.PerspectiveCamera(60, 1, 0.1, 140);
+  readonly camera = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
   /** Horizontal field of view we try to keep (degrees). */
   hfov = 58;
   private shakeT = 0;
@@ -16,7 +16,7 @@ export class View {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.scene.background = makeSkyTexture();
-    this.scene.fog = new THREE.Fog(FOG_COLOR, 45, 120);
+    this.scene.fog = new THREE.Fog(FOG_COLOR, 38, 95);
     window.addEventListener('resize', () => this.resize());
     this.resize();
   }
@@ -29,7 +29,7 @@ export class View {
     this.camera.aspect = aspect;
     const hf = THREE.MathUtils.degToRad(this.hfov);
     let vf = 2 * Math.atan(Math.tan(hf / 2) / aspect);
-    vf = THREE.MathUtils.clamp(vf, THREE.MathUtils.degToRad(48), THREE.MathUtils.degToRad(80));
+    vf = THREE.MathUtils.clamp(vf, THREE.MathUtils.degToRad(40), THREE.MathUtils.degToRad(80));
     this.camera.fov = THREE.MathUtils.radToDeg(vf);
     this.camera.updateProjectionMatrix();
   }

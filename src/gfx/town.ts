@@ -30,7 +30,7 @@ function wallColor(base: number, x: number, y: number, brick: boolean): number {
     const row = Math.floor(y / 2);
     const off = row % 2 ? 2 : 0;
     if (y % 2 === 0 || (x + off) % 4 === 0) return shadeHex(base, 0.72);
-    return shadeHex(base, 0.95 + (((x * 7 + row * 13) % 5) - 2) * 0.03);
+    return base;
   }
   const board = Math.floor(y / 2);
   const seg = Math.floor((x + board * 7) / 22);
@@ -57,7 +57,9 @@ function buildBuilding(def: BuildingDef, seed: number): BuildingVariant {
   g.box(0, 2, 0, 0, H - 1, zf, (_x, y, z) => wc(z, y));
   g.box(W - 1, 2, 0, W - 1, H - 1, zf, (_x, y, z) => wc(z, y));
   g.box(0, 2, 0, W - 1, H - 1, 0, (x, y) => wc(x, y));
-  g.box(0, H - 1, 0, W - 1, H - 1, zf - 2, (x, _y, z) => shadeHex(PAL.roof, (x + z) % 3 === 0 ? 0.9 : 1));
+  g.box(0, H - 1, 0, W - 1, H - 1, zf - 2, PAL.roof);
+  // solid interior: no hidden inner faces get meshed
+  g.box(1, 2, 1, W - 2, H - 2, zf - 2, 0x3a2a1a);
   // foundation
   g.box(0, 0, 0, W - 1, 1, zf, 0x6a5a4a);
 
@@ -358,7 +360,8 @@ export function buildStreet(zStart: number, zEnd: number, seed: number): THREE.G
  */
 export function buildBackdrop(): THREE.Group {
   const group = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+  // Drawn first without depth so it always sits behind the town (acts as a painted background).
+  const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, depthTest: false, depthWrite: false });
   const r = rng(42);
   // Mesas: flat-topped rock formations in layered bands
   const mesaCols = [0xd89a78, 0xc88a6a, 0xe0a888, 0xb87a62];
@@ -397,10 +400,15 @@ export function buildBackdrop(): THREE.Group {
     group.add(m);
   }
   // Sun
-  const sun = new THREE.Mesh(new THREE.CircleGeometry(9, 20), new THREE.MeshBasicMaterial({ color: 0xfff4d0, fog: false }));
+  const sun = new THREE.Mesh(new THREE.CircleGeometry(9, 20), new THREE.MeshBasicMaterial({ color: 0xfff4d0, fog: false, depthTest: false, depthWrite: false }));
   sun.position.set(-40, 55, -170);
   sun.lookAt(0, 0, 0);
   group.add(sun);
-  group.renderOrder = -2;
+  // keep everything inside the camera far plane (same angular size)
+  group.scale.setScalar(0.45);
+  group.traverse((o) => {
+    o.renderOrder = -10;
+    o.frustumCulled = false;
+  });
   return group;
 }

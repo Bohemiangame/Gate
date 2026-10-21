@@ -13,3 +13,19 @@ Sem zapisujem rozhodnutia, ktoré som urobil sám bez otázok. Najnovšie hore v
 - **Kamera**: na výšku je vertikálny uhol obmedzený (max 80°), aby nebolo pol obrazovky oblohy. Pozadie dopĺňajú mesy, oblaky a slnko mimo hmly.
 - **Vzdialenosti v prestrelke 10–17 m**, inak by boli bandity na telefóne príliš malí na mierenie prstom.
 - Pixel ratio max 2, bez antialiasingu (retro hrany, výkon).
+
+## Fázy 2–4 – hrateľnosť
+- **Presun**: skupina beží 6,5 m/s, ťahanie prstom posúva cieľovú pozíciu (celá šírka obrazovky = 9 m), pohyb je vyhladený. Členovia strieľajú **automaticky rovno dopredu**, každý zo svojej pozície → na bránu/bedňu/banditu musíš byť zarovnaný. Počas presunu sa nenabíja.
+- **Brány**: väčšinou +1…+3, ×2 až od 6. levelu, ÷2 občas. **Streľbou sa dá zachrániť len záporná/nulová brána** (najviac na +1). V prvej verzii sa dali vylepšovať aj kladné brány a simulácia ukázala, že skupina vždy narástla na maximum 20 a hra bola triviálna.
+- **Prestrelka**: držíš prst = celá skupina stojí a strieľa salvu na bod pod prstom. **Mierny bod je 56 px nad prstom**, aby prst nezakrýval cieľ (`aimOffsetPx`, dá sa dať na 0). Bandity majú pri mierení mierne zväčšené zásahové boxy (aim assist 12 cm) a mierenie sa „prichytí“ na hlavu/telo.
+- **Kryt a zásah**: keď bandita vystrelí a si vyklonený → 80 % šanca, že padne jeden člen. Keď si skrčený → strela poškodí tvoj kryt (30 HP, 3 na strelu). Keď je kryt zničený, zasahujú aj skrčených (s nižšou presnosťou).
+- **Nabíjanie po jednom náboji** (0,16 s/náboj) – krátke skrčenie = pár nábojov. Gatling nabíja rýchlo, dynamit pomaly.
+- **Varovanie „!“** bliká nad banditom 0,75 s (v neskorších leveloch kratšie, min. 0,45 s). Počas varovania je bandita odkrytý → dá sa zastreliť skôr, ako vystrelí.
+- **Dynamit** (zbraň hráča): hádžu ho max. 3 členovia naraz, plošné poškodenie rastie s veľkosťou skupiny. Bandity s dynamitom hádžu na tvoj kryt.
+- **TNT debny** pri banditoch: výbuch zabije všetkých v okruhu 3,6 m a zničí kryty.
+- **Boss** sa skrýva za vozom (vyššie HP), strieľa dávku 4 rán. Jeho smrť = výhra levelu (zvyšok bandy zmizne).
+- **Hviezdy**: 1 = výhra, 2 = prežije ≥ 60 % najväčšej skupiny, 3 = do časového limitu levelu.
+- **Obchod**: väčšia skupina, poškodenie, rýchlosť streľby, nabíjanie, odolnosť krytu, trvalá štartová zbraň (puška, brokovnica). Ceny rastú geometricky.
+- **Prehra** dáva malú útechu v minciach (podľa prejdenej časti a zabitých), aby sa dalo nakúpiť a skúsiť znova.
+- **Reklamy** sú len prázdne miesto (`src/ads.ts`, `available: false`) – tlačidlo „2× mince“ sa ukáže až po zapojení portálu.
+- **Autopilot (bot)** v kóde hry: používa ho simulácia (`?sim`) a tlačidlo `bot` v `?debug`. Simulácia beží na skutočnej hernej logike bez vykresľovania.
