@@ -7,7 +7,7 @@ export const VS = 0.06;
 /** Guns use finer voxels so barrels/cylinders stay readable. */
 export const GVS = 0.04;
 
-export type Faction = 'posse' | 'bandit' | 'boss';
+export type Faction = 'posse' | 'posseB' | 'sheriff' | 'bandit' | 'boss';
 export type WeaponKind = 'revolver' | 'rifle' | 'shotgun' | 'dynamite' | 'gatling';
 export const WEAPONS: WeaponKind[] = ['revolver', 'rifle', 'shotgun', 'dynamite', 'gatling'];
 
@@ -65,8 +65,42 @@ function lookFor(faction: Faction, seed: number): Look {
       coat: null,
       bandana: false,
       mustache: r() < 0.45,
-      star: seed % 4 === 0,
+      star: false,
       bandolier: false,
+      eyepatch: false,
+      hatTall: r() < 0.3,
+    };
+  }
+  if (faction === 'sheriff') {
+    return {
+      skin: PAL.skin[0],
+      hair: 0x5a3a20,
+      shirt: 0xe8e0d0,
+      pants: 0x2a2624,
+      hat: 0x161412,
+      vest: 0x1a1816,
+      coat: null,
+      bandana: false,
+      mustache: true,
+      star: true,
+      bandolier: false,
+      eyepatch: false,
+      hatTall: true,
+    };
+  }
+  if (faction === 'posseB') {
+    return {
+      skin,
+      hair,
+      shirt: pick([0x3a9a6a, 0x2f8a5a, 0x4aaa7a], r),
+      pants: pick(PAL.pants, r),
+      hat: pick(PAL.posseHat, r),
+      vest: r() < 0.6 ? pick(PAL.posseVest, r) : null,
+      coat: null,
+      bandana: false,
+      mustache: r() < 0.45,
+      star: false,
+      bandolier: r() < 0.3,
       eyepatch: false,
       hatTall: r() < 0.3,
     };
@@ -227,7 +261,7 @@ export function buildCharacter(faction: Faction, seed: number): CharacterModel {
     g.box(0, 2, 0, 1, 8, 1, sleeve);
     g.box(0, 2, 0, 1, 2, 1, shadeHex(sleeve, 0.8)); // cuff
     g.box(0, 0, 0, 1, 1, 1, L.skin);
-    if (faction !== 'posse' && gunHand) g.box(0, 1, 0, 1, 1, 1, 0x3a2a20); // glove
+    if ((faction === 'bandit' || faction === 'boss') && gunHand) g.box(0, 1, 0, 1, 1, 1, 0x3a2a20); // glove
     return g;
   };
   const armLG = arm(false);

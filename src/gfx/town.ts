@@ -14,11 +14,34 @@ const DEPTH = 32; // voxels (4 m)
 
 type Kind = 'saloon' | 'bank' | 'hotel' | 'sheriff' | 'store' | 'barber' | 'guns' | 'post' | 'livery' | 'plain';
 
-interface BuildingDef {
+export interface BuildingDef {
   kind: Kind;
   sign: string | null;
   width: number; // voxels
   twoStory: boolean;
+  /** 1–3 floors; overrides twoStory when set. */
+  stories?: number;
+  /** false = no porch / boardwalk in front. */
+  porch?: boolean;
+}
+
+// Boardwalk plank palettes (weathered grey, brown, reddish, pale)
+const FLOOR_STYLES = [
+  [0x8a7a68, 0x7a6a5a, 0x9a8a76, 0x6e6052],
+  [0x8a5c34, 0x7a5030, 0x9a6a3e, 0x6a4628],
+  [0x9a5a3e, 0x8a4e36, 0xa86a48, 0x7a4430],
+  [0xb89a70, 0xa88a62, 0xc8aa80, 0x98805a],
+];
+
+/** Narrow planks running along the building with staggered joints. */
+function plankColor(style: number[], x: number, z: number, seed: number): number {
+  const plank = z; // one voxel (12.5 cm) per plank
+  const len = 12 + ((plank * 7 + seed) % 9);
+  const off = (plank * 13 + seed * 3) % len;
+  const seg = Math.floor((x + off) / len);
+  const joint = (x + off) % len === 0;
+  const tone = style[(plank * 3 + seg * 5 + seed) % style.length];
+  return joint ? shadeHex(tone, 0.6) : tone;
 }
 
 export interface BuildingVariant {
@@ -40,10 +63,14 @@ function wallColor(base: number, x: number, y: number, brick: boolean): number {
   return shadeHex(base, (0.9 + h * 0.16) * seam);
 }
 
-function buildBuilding(def: BuildingDef, seed: number): BuildingVariant {
+export function buildBuilding(def: BuildingDef, seed: number): BuildingVariant {
   const r = rng(seed);
   const W = def.width;
-  const H = def.twoStory ? 48 : 28;
+  const stories = def.stories ?? (def.twoStory ? 2 : 1);
+  const H = (stories === 1 ? 28 : stories === 2 ? 48 : 66) + Math.floor(r() * 3) * 2;
+  const hasPorch = def.porch !== false;
+  const floor = FLOOR_STYLES[Math.floor(r() * FLOOR_STYLES.length)];
+  const fseed = Math.floor(r() * 1000);
   const F = def.kind === 'livery' ? 0 : 8 + Math.floor(r() * 7);
   const g = new VoxelGrid(W, H + F + 12, DEPTH + PORCH + 1);
   const zf = DEPTH - 1; // facade plane
@@ -160,7 +187,8 @@ function buildBuilding(def: BuildingDef, seed: number): BuildingVariant {
       win(dx - 24, 7, 10);
       win(dx + 32, 7, 10);
     }
-    if (def.twoStory) for (let cx = 9; cx < W - 6; cx += 15) win(cx, 30, 11);
+    if (stories >= 2) for (let cx = 9; cx < W - 6; cx += 15) win(cx, 30, 11);
+    if (stories >= 3) for (let cx = 9; cx < W - 6; cx += 15) win(cx, 49, 11);
 
     if (def.kind === 'barber') {
       g.box(dx - 3, 6, zf + 2, dx - 3, 18, zf + 2, (_x, y) => (Math.floor(y / 2) % 2 ? 0xd8262e : 0xf8f8f8));
@@ -169,14 +197,15 @@ function buildBuilding(def: BuildingDef, seed: number): BuildingVariant {
 
   // Porch: boardwalk, posts, roof
   const PZ0 = DEPTH, PZ1 = DEPTH + PORCH - 1;
-  g.box(0, 0, PZ0 - 1, W - 1, 1, PZ1, (x, _y, z) => shadeHex(PAL.plank[3], (x % 6 === 0 ? 0.75 : 1) * (z % 2 ? 0.95 : 1.05)));
+  if (!hasPorch) return { geo: meshGrid(g, BVS, [W / 2, 0, DEPTH + PORCH]), widthM: W * BVS };
+  g.box(0, 0, PZ0 - 1, W - 1, 1, PZ1, (x, y, z) => (y === 1 ? plankColor(floor, x, z, fseed) : shadeHex(floor[1], 0.7)));
   const porchY = 22;
   const posts: number[] = [1, W - 3];
   if (W > 50) posts.push(Math.floor(W / 2) - 1);
   for (const px of posts) g.box(px, 2, PZ1 - 1, px + 1, porchY - 1, PZ1, PAL.woodDark);
   g.box(0, porchY, PZ0, W - 1, porchY + 1, PZ1, (x) => shadeHex(PAL.roof, x % 4 === 0 ? 0.85 : 1.05));
   g.box(0, porchY - 1, PZ1, W - 1, porchY - 1, PZ1, trim);
-  if (def.twoStory) {
+  if (stories >= 2) {
     // balcony railing on the porch roof
     for (let x = 0; x < W; x += 5) g.box(x, porchY + 2, PZ1, x, porchY + 5, PZ1, PAL.woodDark);
     g.box(0, porchY + 6, PZ1, W - 1, porchY + 6, PZ1, trim);

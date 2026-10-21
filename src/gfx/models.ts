@@ -2,7 +2,7 @@ import { buildCharacter, buildGun, CharacterModel, Faction, GunModel, WeaponKind
 import { Character } from './character';
 
 // Model cache: a handful of variants per faction, shared by every character instance.
-const VARIANTS: Record<Faction, number> = { posse: 8, bandit: 6, boss: 1 };
+const VARIANTS: Record<Faction, number> = { posse: 8, posseB: 6, sheriff: 1, bandit: 6, boss: 1 };
 const charCache = new Map<string, CharacterModel>();
 const gunCache = new Map<WeaponKind, GunModel>();
 
@@ -11,7 +11,7 @@ export function charModel(faction: Faction, i: number): CharacterModel {
   const key = faction + v;
   let m = charCache.get(key);
   if (!m) {
-    m = buildCharacter(faction, v + (faction === 'bandit' ? 100 : faction === 'boss' ? 200 : 0));
+    m = buildCharacter(faction, v + ({ posse: 0, posseB: 50, sheriff: 300, bandit: 100, boss: 200 } as Record<Faction, number>)[faction]);
     charCache.set(key, m);
   }
   return m;
