@@ -5,6 +5,7 @@ import { Game } from './game/game';
 import { installDebug } from './debug';
 import { runSim } from './sim';
 import { startTactics } from './tactics';
+import { startPizza } from './pizza';
 
 const params = new URLSearchParams(location.search);
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -18,6 +19,8 @@ document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: fal
 
 if (params.has('showcase') || params.has('view')) {
   startShowcase(view, params);
+} else if (params.has('pizza')) {
+  startPizza(view, ui, params);
 } else if (params.has('tactics')) {
   startTactics(view, ui, params);
 } else if (params.has('sim')) {
